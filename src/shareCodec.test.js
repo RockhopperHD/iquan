@@ -2,9 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_STATE,
   SHARE_CODE_VERSION,
+  createShareUrl,
   decodeState,
   encodeIconState,
   encodeState,
+  extractShareCodeFromUrl,
+  resolveUrlHydration,
   sanitizeIconState,
 } from "./App.jsx";
 
@@ -96,6 +99,69 @@ describe("share codec", () => {
     expect(decoded.particles.bottomLeft.icon.baseImageData).toBe("");
   });
 
+  it("extracts share code from ?code query", () => {
+    const code = encodeState(DEFAULT_STATE, {}, 500, { urlSafe: true });
+    const url = new URL(`https://example.com/?code=${encodeURIComponent(code)}`);
+    expect(extractShareCodeFromUrl(url)).toBe(code);
+  });
+
+  it("extracts share code from legacy /code?= query", () => {
+    const code = encodeState(DEFAULT_STATE, {}, 500, { urlSafe: true });
+    const url = new URL(`https://example.com/code?=${encodeURIComponent(code)}`);
+    expect(extractShareCodeFromUrl(url)).toBe(code);
+  });
+
+  it("treats blank and missing code query values as absent", () => {
+    expect(extractShareCodeFromUrl(new URL("https://example.com/?code="))).toBe("");
+    expect(extractShareCodeFromUrl(new URL("https://example.com/"))).toBe("");
+  });
+
+  it("resolves hydration to default for missing, blank, and invalid URL code", () => {
+    const fallbackCode = encodeState(DEFAULT_STATE, {}, 500, { urlSafe: true });
+    const missing = resolveUrlHydration(new URL("https://example.com/"), fallbackCode);
+    const blank = resolveUrlHydration(new URL("https://example.com/?code="), fallbackCode);
+    const invalid = resolveUrlHydration(new URL("https://example.com/?code=IC10|bad"), fallbackCode);
+
+    expect(missing.status).toBe("missing");
+    expect(missing.shareCode).toBe(fallbackCode);
+    expect(blank.status).toBe("missing");
+    expect(blank.shareCode).toBe(fallbackCode);
+    expect(invalid.status).toBe("invalid");
+    expect(invalid.shareCode).toBe(fallbackCode);
+    expect(invalid.invalidCode).toBe("IC10|bad");
+  });
+
+  it("resolves hydration to decoded URL state when code is valid", () => {
+    const code = encodeState(DEFAULT_STATE, {}, 500, { urlSafe: true });
+    const next = resolveUrlHydration(
+      new URL(`https://example.com/?code=${encodeURIComponent(code)}`),
+      "IC10|fallback",
+    );
+
+    expect(next.status).toBe("valid");
+    expect(next.shareCode).toBe(code);
+    expect(next.decoded.canvasSize).toBe(500);
+    expect(next.decoded.base.content).toBe(DEFAULT_STATE.content);
+  });
+
+  it("creates canonical share links and strips legacy /code path + unnamed query keys", () => {
+    const code = encodeState(DEFAULT_STATE, {}, 500, { urlSafe: true });
+    const normalized = createShareUrl(code, {
+      currentUrl: `https://example.com/code?=${encodeURIComponent(code)}#old`,
+      basePath: "/",
+    });
+    expect(normalized).toBe(`https://example.com/?code=${encodeURIComponent(code)}`);
+  });
+
+  it("creates canonical share links for subpath deployments", () => {
+    const code = encodeState(DEFAULT_STATE, {}, 500, { urlSafe: true });
+    const normalized = createShareUrl(code, {
+      currentUrl: "https://example.com/code?=IC10%7Clegacy",
+      basePath: "/iquan",
+    });
+    expect(normalized).toBe(`https://example.com/iquan/?code=${encodeURIComponent(code)}`);
+  });
+
   it("decodes IC9 payloads for backward compatibility", () => {
     const base = sanitizeIconState({
       ...DEFAULT_STATE,
@@ -127,7 +193,7 @@ describe("share codec", () => {
 
     const decoded = decodeState(legacyCode);
     expect(decoded.canvasSize).toBe(500);
-    expect(decoded.base.mode).toBe("lucide");
+    expect(decoded.base.mode).toBe("icon");
     expect(decoded.base.lucide).toBe("bell-ring");
     expect(decoded.base.size).toBe(184);
   });

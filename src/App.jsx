@@ -1476,9 +1476,40 @@ function isShareCodeFormat(value) {
   return /^IC\d+\|/.test(String(value || "").trim());
 }
 
+function normalizeBasePath(value) {
+  const trimmed = String(value || "").trim();
+  if (!trimmed) return "/";
+  const withLeadingSlash = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
+  return withLeadingSlash.endsWith("/") ? withLeadingSlash : `${withLeadingSlash}/`;
+}
+
+function getCanonicalBasePath(basePath) {
+  const runtimeBasePath = basePath ?? import.meta.env?.BASE_URL ?? "/";
+  return normalizeBasePath(runtimeBasePath);
+}
+
+function extractShareCodeFromSearch(url) {
+  const namedSearchCode = url.searchParams.get("code") || url.searchParams.get("c");
+  if (isShareCodeFormat(namedSearchCode)) return namedSearchCode.trim();
+
+  // Supports legacy links shaped like /code?=IC10|...
+  const unnamedSearchCode = url.searchParams.get("");
+  if (isShareCodeFormat(unnamedSearchCode)) return unnamedSearchCode.trim();
+
+  const rawSearch = String(url.search || "")
+    .replace(/^\?/, "")
+    .trim();
+  if (rawSearch && !rawSearch.includes("=")) {
+    const decodedSearch = safeDecodeURIComponent(rawSearch).trim();
+    if (isShareCodeFormat(decodedSearch)) return decodedSearch;
+  }
+
+  return "";
+}
+
 function extractShareCodeFromUrl(url) {
-  const searchCode = url.searchParams.get("code") || url.searchParams.get("c");
-  if (isShareCodeFormat(searchCode)) return searchCode.trim();
+  const searchCode = extractShareCodeFromSearch(url);
+  if (searchCode) return searchCode;
 
   const rawHash = url.hash.startsWith("#") ? url.hash.slice(1) : url.hash;
   if (rawHash) {
@@ -1515,10 +1546,38 @@ function resolveShareCodeInput(input) {
   return inlineCodeMatch ? inlineCodeMatch[0] : trimmed;
 }
 
-function createShareUrl(code) {
-  const url = new URL(window.location.href);
+function resolveUrlHydration(url, fallbackCode) {
+  const codeFromUrl = extractShareCodeFromUrl(url);
+  if (!codeFromUrl) {
+    return { status: "missing", shareCode: fallbackCode };
+  }
+
+  try {
+    const decoded = decodeState(codeFromUrl);
+    return {
+      status: "valid",
+      shareCode: codeFromUrl,
+      decoded,
+    };
+  } catch {
+    return {
+      status: "invalid",
+      invalidCode: codeFromUrl,
+      shareCode: fallbackCode,
+    };
+  }
+}
+
+function createShareUrl(code, options = {}) {
+  const hasWindow = typeof window !== "undefined";
+  const currentUrl =
+    options.currentUrl || (hasWindow ? window.location.href : "https://example.com/");
+  const fallbackOrigin = hasWindow ? window.location.origin : "https://example.com";
+  const url = new URL(currentUrl, fallbackOrigin);
+
+  url.pathname = getCanonicalBasePath(options.basePath);
+  url.search = "";
   url.searchParams.set("code", code);
-  url.searchParams.delete("c");
   url.hash = "";
   return url.toString();
 }
@@ -3265,20 +3324,22 @@ function App() {
   useEffect(() => {
     if (hasHydratedFromUrlRef.current) return;
 
-    const codeFromUrl = extractShareCodeFromUrl(new URL(window.location.href));
-    if (codeFromUrl) {
-      skipNextShareUrlSyncRef.current = true;
-      setLoadCode(codeFromUrl);
-      try {
-        const next = decodeState(codeFromUrl);
-        setBaseState(next.base);
-        setParticles(next.particles);
-        setCanvasSize(next.canvasSize);
-        setEditorTarget({ type: "base" });
-        setToast("Loaded code from URL");
-      } catch {
-        setToast("URL code is invalid");
-      }
+    const hydration = resolveUrlHydration(
+      new URL(window.location.href),
+      encodeState(DEFAULT_STATE, {}, DEFAULT_CANVAS_SIZE, { urlSafe: true }),
+    );
+
+    if (hydration.status === "valid") {
+      skipNextShareUrlSyncRef.current = hydration.shareCode !== urlSafeShareCode;
+      setLoadCode(hydration.shareCode);
+      setBaseState(hydration.decoded.base);
+      setParticles(hydration.decoded.particles);
+      setCanvasSize(hydration.decoded.canvasSize);
+      setEditorTarget({ type: "base" });
+      setToast("Loaded code from URL");
+    } else if (hydration.status === "invalid") {
+      setLoadCode(hydration.invalidCode);
+      setToast("URL code is invalid");
     }
 
     hasHydratedFromUrlRef.current = true;
@@ -5058,7 +5119,7 @@ function App() {
             </a>
             <a
               className="about-modal-link about-modal-link-secondary"
-              href="https://github.com"
+              href="https://github.com/RockhopperHD/iquan"
               target="_blank"
               rel="noreferrer"
             >
@@ -5166,6 +5227,9 @@ function App() {
 export {
   DEFAULT_STATE,
   SHARE_CODE_VERSION,
+  extractShareCodeFromUrl,
+  resolveUrlHydration,
+  createShareUrl,
   encodeIconState,
   encodeState,
   decodeState,
