@@ -1,0 +1,160 @@
+import { describe, expect, it } from "vitest";
+import {
+  DEFAULT_STATE,
+  SHARE_CODE_VERSION,
+  decodeState,
+  encodeIconState,
+  encodeState,
+  sanitizeIconState,
+} from "./App.jsx";
+
+describe("share codec", () => {
+  it("encodes and decodes IC10 with content + shape image fields", () => {
+    const base = sanitizeIconState({
+      ...DEFAULT_STATE,
+      mode: "image",
+      shape: "image",
+      content: "OK",
+      imageData: "data:image/png;base64,CONTENT_IMAGE",
+      imageName: "content-image",
+      imageWidth: 120,
+      imageHeight: 96,
+      imageCropEnabled: true,
+      imageCropX: 0.07,
+      imageCropY: 0.03,
+      imageCropSize: 0.82,
+      baseImageData: "data:image/png;base64,SHAPE_IMAGE",
+      baseImageName: "shape-image",
+      baseImageWidth: 128,
+      baseImageHeight: 128,
+      baseImageCropEnabled: true,
+      baseImageCropX: 0.11,
+      baseImageCropY: 0.04,
+      baseImageCropSize: 0.9,
+      fillStops: ["#112233", "#445566"],
+      strokeStops: ["#99aabb", "#ccddee"],
+      strokeGradientType: "radial",
+    });
+
+    const particles = {
+      topRight: {
+        offsetX: 12,
+        offsetY: -8,
+        icon: sanitizeIconState({
+          ...DEFAULT_STATE,
+          mode: "image",
+          content: "P",
+          imageData: "data:image/png;base64,PARTICLE_IMAGE",
+          imageName: "particle-image",
+          imageWidth: 64,
+          imageHeight: 64,
+        }),
+      },
+    };
+
+    const code = encodeState(base, particles, 640);
+    expect(code.startsWith(`${SHARE_CODE_VERSION}|`)).toBe(true);
+
+    const decoded = decodeState(code);
+    expect(decoded.canvasSize).toBe(640);
+    expect(decoded.base.imageData).toBe(base.imageData);
+    expect(decoded.base.baseImageData).toBe(base.baseImageData);
+    expect(decoded.base.baseImageName).toBe("shape-image");
+    expect(decoded.particles.topRight.icon.imageData).toBe(
+      "data:image/png;base64,PARTICLE_IMAGE",
+    );
+  });
+
+  it("creates URL-safe share codes without embedded image payloads", () => {
+    const base = sanitizeIconState({
+      ...DEFAULT_STATE,
+      mode: "image",
+      shape: "image",
+      imageData: "data:image/png;base64,CONTENT_IMAGE",
+      baseImageData: "data:image/png;base64,SHAPE_IMAGE",
+    });
+
+    const particles = {
+      bottomLeft: {
+        offsetX: -6,
+        offsetY: 9,
+        icon: sanitizeIconState({
+          ...DEFAULT_STATE,
+          mode: "image",
+          imageData: "data:image/png;base64,PARTICLE_IMAGE",
+        }),
+      },
+    };
+
+    const urlSafeCode = encodeState(base, particles, 500, { urlSafe: true });
+    expect(urlSafeCode).not.toContain("data:image/");
+
+    const decoded = decodeState(urlSafeCode);
+    expect(decoded.base.imageData).toBe("");
+    expect(decoded.base.baseImageData).toBe("");
+    expect(decoded.particles.bottomLeft.icon.imageData).toBe("");
+    expect(decoded.particles.bottomLeft.icon.baseImageData).toBe("");
+  });
+
+  it("decodes IC9 payloads for backward compatibility", () => {
+    const base = sanitizeIconState({
+      ...DEFAULT_STATE,
+      mode: "image",
+      baseImageData: "data:image/png;base64,SHAPE_IMAGE",
+      baseImageName: "shape",
+    });
+
+    const ic10Code = encodeState(base, {}, 500);
+    const ic9Code = ic10Code.replace(/^IC10\|/, "IC9|");
+
+    const decoded = decodeState(ic9Code);
+    expect(decoded.base.baseImageData).toBe("data:image/png;base64,SHAPE_IMAGE");
+    expect(decoded.base.baseImageName).toBe("shape");
+  });
+
+  it("continues to decode legacy IC6 codes", () => {
+    const legacyState = sanitizeIconState({
+      ...DEFAULT_STATE,
+      mode: "lucide",
+      lucide: "bell-ring",
+      size: 184,
+      fillStops: ["#abcdef"],
+      strokeStops: ["#223344"],
+    });
+
+    const legacyCode = encodeIconState(legacyState);
+    expect(legacyCode.startsWith("IC6|")).toBe(true);
+
+    const decoded = decodeState(legacyCode);
+    expect(decoded.canvasSize).toBe(500);
+    expect(decoded.base.mode).toBe("lucide");
+    expect(decoded.base.lucide).toBe("bell-ring");
+    expect(decoded.base.size).toBe(184);
+  });
+
+  it("keeps updated fillStops when legacy fill is stale", () => {
+    const sanitized = sanitizeIconState({
+      ...DEFAULT_STATE,
+      fill: "#111111",
+      fillStops: ["#22cc88", "#004422"],
+    });
+
+    expect(sanitized.fill).toBe("#22cc88");
+    expect(sanitized.fillStops[0]).toBe("#22cc88");
+    expect(sanitized.fillStops[1]).toBe("#004422");
+  });
+
+  it("keeps updated strokeStops when legacy stroke color is stale", () => {
+    const sanitized = sanitizeIconState({
+      ...DEFAULT_STATE,
+      strokeColor: "#111111",
+      outlineColor: "#111111",
+      strokeStops: ["#ff8844", "#5a2a00"],
+    });
+
+    expect(sanitized.strokeColor).toBe("#ff8844");
+    expect(sanitized.outlineColor).toBe("#ff8844");
+    expect(sanitized.strokeStops[0]).toBe("#ff8844");
+    expect(sanitized.strokeStops[1]).toBe("#5a2a00");
+  });
+});
