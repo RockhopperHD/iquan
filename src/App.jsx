@@ -4891,7 +4891,7 @@ function App() {
               <h3>{previewContextMode === "message" ? "Message Preview" : "Quick Previews"}</h3>
               <span>
                 {previewContextMode === "message"
-                  ? "messenging platforms"
+                  ? "Messaging Platforms"
                   : "White, #323338, and black"}
               </span>
             </div>

@@ -58,7 +58,7 @@ button {
 .app-shell {
   width: min(1380px, calc(100% - 32px));
   margin: 0 auto;
-  padding: 20px 0 124px;
+  padding: 20px 0 116px;
   height: 100%;
   max-height: 100%;
   display: grid;
@@ -978,11 +978,8 @@ button:disabled {
   height: 100%;
   padding: 14px;
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
   gap: 12px;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding-bottom: 86px;
 }
 
 .preview-header {
@@ -1343,7 +1340,7 @@ button:disabled {
   background-position: 0 0, 12px 12px;
   display: grid;
   place-items: center;
-  min-height: clamp(340px, 52vh, 520px);
+  min-height: 360px;
   padding: 16px;
   overflow: hidden;
 }
@@ -1534,11 +1531,20 @@ button:disabled {
 
 .preview-main-shell {
   width: 100%;
-  min-height: clamp(320px, 50vh, 512px);
+  min-height: 0;
+  height: 100%;
   display: grid;
   place-items: center;
   overflow: auto;
   padding: 8px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.preview-main-shell::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
 }
 
 .preview-canvas {
