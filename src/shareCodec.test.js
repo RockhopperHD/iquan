@@ -12,7 +12,7 @@ import {
 } from "./App.jsx";
 
 describe("share codec", () => {
-  it("encodes and decodes IC10 with content + shape image fields", () => {
+  it("encodes and decodes current share codes with content + shape image fields", () => {
     const base = sanitizeIconState({
       ...DEFAULT_STATE,
       mode: "image",
@@ -59,6 +59,7 @@ describe("share codec", () => {
     expect(code.startsWith(`${SHARE_CODE_VERSION}|`)).toBe(true);
 
     const decoded = decodeState(code);
+    expect(decoded.version).toBe(SHARE_CODE_VERSION);
     expect(decoded.canvasSize).toBe(640);
     expect(decoded.base.imageData).toBe(base.imageData);
     expect(decoded.base.baseImageData).toBe(base.baseImageData);
@@ -170,10 +171,11 @@ describe("share codec", () => {
       baseImageName: "shape",
     });
 
-    const ic10Code = encodeState(base, {}, 500);
-    const ic9Code = ic10Code.replace(/^IC10\|/, "IC9|");
+    const currentCode = encodeState(base, {}, 500);
+    const ic9Code = currentCode.replace(new RegExp(`^${SHARE_CODE_VERSION}\\|`), "IC9|");
 
     const decoded = decodeState(ic9Code);
+    expect(decoded.version).toBe("IC9");
     expect(decoded.base.baseImageData).toBe("data:image/png;base64,SHAPE_IMAGE");
     expect(decoded.base.baseImageName).toBe("shape");
   });

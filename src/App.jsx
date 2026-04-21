@@ -16,7 +16,7 @@ const GRADIENT_TYPES = ["linear", "radial"];
 const MAX_GRADIENT_STOPS = 2;
 const MAX_BACK_DISTANCE = 32;
 const ICON_CODE_VERSION = "IC6";
-const SHARE_CODE_VERSION = "IC10";
+const SHARE_CODE_VERSION = "IC11";
 const IQUAN_LOGO_CODE =
   "IC10|eyJiIjp7InQiOiJpcSIsIndzIjoxMDAsInIiOjQ2LCJmdyI6IjgwMCIsImYiOlsiI2ZmZmZmZiIsIiNiYWU5ZTMiXSwiZnQiOiJyYWRpYWwiLCJmeCI6MTcsImZ5IjoyMiwibyI6WyIjMDAwMDAwIiwiIzA0ODQ5NSJdLCJvYSI6MjQ2LCJvbCI6OX0sInAiOltbMiwtMzcsMzgseyJtIjoiaWNvbiIsImgiOiJjaXJjbGUiLCJ0IjoiaXEiLCJsIjoiaGVhcnQiLCJsdyI6My42LCJzIjo2NCwiaXMiOjYwLCJ3cyI6MTAwLCJyIjo0NiwiZnciOiI4MDAiLCJpbiI6MTQsImYiOlsiI2ZmOGE4YSJdLCJmdCI6InJhZGlhbCIsImZ4IjoxNywiZnkiOjIyLCJibyI6MCwidGMiOiIjZmY1YzVjIiwibyI6WyIjMDQ4NDk1Il0sIm9hIjoyNDYsIm9sIjowfV1dfQ";
 const PARTICLE_OFFSET_LIMIT = 120;
@@ -1615,6 +1615,7 @@ function encodeState(base, particles, canvasSize, options = {}) {
   }
 
   const payload = {
+    version: SHARE_CODE_VERSION,
     b: compactIconState(safeBase),
   };
   if (safeCanvasSize !== DEFAULT_CANVAS_SIZE) payload.c = safeCanvasSize;
@@ -1629,7 +1630,7 @@ function decodeState(code) {
 
   const [version, ...rest] = trimmed.split("|");
 
-  if (version === SHARE_CODE_VERSION || version === "IC9") {
+  if ([SHARE_CODE_VERSION, "IC10", "IC9"].includes(version)) {
     const parsed = JSON.parse(decodeBase64Url(rest.join("|")));
     const base = sanitizeIconState(expandCompactIconState(parsed?.b));
     const canvasSize = clamp(
@@ -1656,7 +1657,7 @@ function decodeState(code) {
         particles[cornerKey] = sanitizeParticle(source, base);
       }
     }
-    return { base, particles, canvasSize };
+    return { version, base, particles, canvasSize };
   }
 
   if (["IC8", "IC7"].includes(version)) {
@@ -1673,11 +1674,11 @@ function decodeState(code) {
       if (!parsed?.particles?.[corner.key]) continue;
       particles[corner.key] = sanitizeParticle(parsed.particles[corner.key], base);
     }
-    return { base, particles, canvasSize };
+    return { version, base, particles, canvasSize };
   }
 
   const base = decodeLegacyIconState(trimmed);
-  return { base, particles: {}, canvasSize: DEFAULT_CANVAS_SIZE };
+  return { version, base, particles: {}, canvasSize: DEFAULT_CANVAS_SIZE };
 }
 
 function getCompositeBounds(baseMetrics, particleLayers) {
@@ -2703,6 +2704,22 @@ function ImageCropModal({
   const previewHeight = safeHeight * previewScale;
   const previewRef = useRef(null);
   const interactionRef = useRef(null);
+  const onDraftChangeRef = useRef(onDraftChange);
+
+  useEffect(() => {
+    onDraftChangeRef.current = onDraftChange;
+  }, [onDraftChange]);
+
+  const getPreviewPoint = (event, rect) => {
+    const renderedScaleX = rect.width / safeWidth;
+    const renderedScaleY = rect.height / safeHeight;
+    if (renderedScaleX <= 0 || renderedScaleY <= 0) return null;
+
+    return {
+      x: clamp((event.clientX - rect.left) / renderedScaleX, 0, safeWidth),
+      y: clamp((event.clientY - rect.top) / renderedScaleY, 0, safeHeight),
+    };
+  };
 
   const startInteraction = (event, mode, handle = null) => {
     if (event.button !== 0) return;
@@ -2716,15 +2733,15 @@ function ImageCropModal({
       event.stopPropagation();
     }
 
-    const pointerX = clamp((event.clientX - rect.left) / previewScale, 0, safeWidth);
-    const pointerY = clamp((event.clientY - rect.top) / previewScale, 0, safeHeight);
+    const pointer = getPreviewPoint(event, rect);
+    if (!pointer) return;
 
     interactionRef.current = {
       mode,
       handle,
       pointerId: event.pointerId,
-      startPointerX: pointerX,
-      startPointerY: pointerY,
+      startPointerX: pointer.x,
+      startPointerY: pointer.y,
       startLeft: safeDraft.x * safeWidth,
       startTop: safeDraft.y * safeHeight,
       startSize: cropSizePx,
@@ -2761,8 +2778,10 @@ function ImageCropModal({
       if (!preview || previewScale <= 0) return;
 
       const rect = preview.getBoundingClientRect();
-      const pointerX = clamp((event.clientX - rect.left) / previewScale, 0, safeWidth);
-      const pointerY = clamp((event.clientY - rect.top) / previewScale, 0, safeHeight);
+      const pointer = getPreviewPoint(event, rect);
+      if (!pointer) return;
+      const pointerX = pointer.x;
+      const pointerY = pointer.y;
       let left = active.startLeft;
       let top = active.startTop;
       let size = active.startSize;
@@ -2882,7 +2901,7 @@ function ImageCropModal({
         }
       }
 
-      onDraftChange(
+      onDraftChangeRef.current(
         clampCropDraft(
           {
             size: size / shorter,
@@ -2909,7 +2928,7 @@ function ImageCropModal({
       window.removeEventListener("pointercancel", handlePointerEnd);
       releaseInteraction();
     };
-  }, [onDraftChange, previewScale, safeHeight, safeWidth, shorter]);
+  }, [previewScale, safeHeight, safeWidth, shorter]);
 
   const overlayStyle = {
     left: `${safeDraft.x * safeWidth * previewScale}px`,
@@ -2917,6 +2936,29 @@ function ImageCropModal({
     width: `${cropSizePx * previewScale}px`,
     height: `${cropSizePx * previewScale}px`,
   };
+  const cropPreviewLeft = safeDraft.x * safeWidth * previewScale;
+  const cropPreviewTop = safeDraft.y * safeHeight * previewScale;
+  const cropPreviewSize = cropSizePx * previewScale;
+  const cropPreviewRight = cropPreviewLeft + cropPreviewSize;
+  const cropPreviewBottom = cropPreviewTop + cropPreviewSize;
+  const scrims = [
+    { key: "top", left: 0, top: 0, width: previewWidth, height: cropPreviewTop },
+    {
+      key: "right",
+      left: cropPreviewRight,
+      top: cropPreviewTop,
+      width: Math.max(0, previewWidth - cropPreviewRight),
+      height: cropPreviewSize,
+    },
+    {
+      key: "bottom",
+      left: 0,
+      top: cropPreviewBottom,
+      width: previewWidth,
+      height: Math.max(0, previewHeight - cropPreviewBottom),
+    },
+    { key: "left", left: 0, top: cropPreviewTop, width: cropPreviewLeft, height: cropPreviewSize },
+  ];
 
   return (
     <Modal
@@ -2925,14 +2967,14 @@ function ImageCropModal({
       onClose={onClose}
       actions={
         <>
-          <button type="button" className="btn-primary" onClick={onApplyCrop}>
-            Apply square crop
+          <button type="button" className="btn-ghost" onClick={onClose}>
+            Cancel
           </button>
           <button type="button" className="btn-secondary" onClick={onKeepOriginal}>
             Keep original
           </button>
-          <button type="button" className="btn-ghost" onClick={onClose}>
-            Cancel
+          <button type="button" className="btn-primary" onClick={onApplyCrop}>
+            Apply square crop
           </button>
         </>
       }
@@ -2950,6 +2992,19 @@ function ImageCropModal({
             style={{ width: `${previewWidth}px`, height: `${previewHeight}px` }}
           >
             <img src={imageData} alt="" draggable={false} />
+            {scrims.map((scrim) => (
+              <div
+                key={scrim.key}
+                className="image-crop-scrim"
+                aria-hidden="true"
+                style={{
+                  left: `${scrim.left}px`,
+                  top: `${scrim.top}px`,
+                  width: `${scrim.width}px`,
+                  height: `${scrim.height}px`,
+                }}
+              />
+            ))}
             <div
               className="image-crop-overlay"
               style={overlayStyle}
@@ -3879,9 +3934,9 @@ function App() {
 
   const quickPreviewSize = 60;
   const quickPreviewScale = getContextScale(quickPreviewSize, compositeBounds);
-  const messageInlineScale = getContextScale(22, compositeBounds);
-  const messageLargeScale = getContextScale(72, compositeBounds);
-  const messageReactionScale = getContextScale(18, compositeBounds);
+  const messageInlineScale = getContextScale(20, compositeBounds);
+  const messageLargeScale = getContextScale(54, compositeBounds);
+  const messageReactionScale = getContextScale(16, compositeBounds);
   const contextOffsetX = -compositeBounds.minX;
   const contextOffsetY = -compositeBounds.minY;
 
@@ -4217,7 +4272,12 @@ function App() {
         </div>
       </header>
 
-      <aside ref={controlsRef} className="controls">
+      <div className="pane-column">
+        <div className="pane-display-head">
+          <h2 className="pane-display-title">Editor</h2>
+        </div>
+
+        <aside ref={controlsRef} className="controls">
         <div className="editor-target-banner">
           <div className="editor-target-head">
             <h2 className="editor-target-title">
@@ -4849,165 +4909,171 @@ function App() {
           </button>
         </section>
 
-      </aside>
+        </aside>
+      </div>
 
-      <main className="preview">
-        <div className="preview-header">
-          <h2>Preview</h2>
-          <span>
-            Base {baseMetrics.dimensions.width} x {baseMetrics.dimensions.height} in{" "}
-            {canvasSize} x {canvasSize} canvas |{" "}
-            {baseState.mode === "text"
-              ? `fit ${baseMetrics.fittedFontSize}px`
-              : baseMetrics.iconName}
-          </span>
+      <div className="pane-column">
+        <div className="pane-display-head">
+          <h2 className="pane-display-title">Preview</h2>
         </div>
 
-        <div className="preview-stage">
-          <div className="preview-main-shell">
-            <div
-              className="preview-canvas"
-              style={{ width: `${canvasSize}px`, height: `${canvasSize}px` }}
-            >
+        <main className={previewContextMode === "message" ? "preview preview-message-mode" : "preview"}>
+          <div className="preview-header">
+            <span>
+              Base {baseMetrics.dimensions.width} x {baseMetrics.dimensions.height} in{" "}
+              {canvasSize} x {canvasSize} canvas |{" "}
+              {baseState.mode === "text"
+                ? `fit ${baseMetrics.fittedFontSize}px`
+                : baseMetrics.iconName}
+            </span>
+          </div>
+
+          <div className="preview-stage">
+            <div className="preview-main-shell">
               <div
-                className="preview-zoom-layer"
-                style={{
-                  transform: previewCompositionTransform,
-                }}
+                className="preview-canvas"
+                style={{ width: `${canvasSize}px`, height: `${canvasSize}px` }}
               >
-                {renderCompositeIconStack({
-                  className: "preview-main-stack",
-                  interactive: true,
-                  showCornerHotspots: true,
-                })}
+                <div
+                  className="preview-zoom-layer"
+                  style={{
+                    transform: previewCompositionTransform,
+                  }}
+                >
+                  {renderCompositeIconStack({
+                    className: "preview-main-stack",
+                    interactive: true,
+                    showCornerHotspots: true,
+                  })}
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        <section className="preview-contexts">
-          <div className="preview-contexts-head">
-            <div className="preview-contexts-title">
-              <h3>{previewContextMode === "message" ? "Message Preview" : "Quick Previews"}</h3>
-              <span>
-                {previewContextMode === "message"
-                  ? "Messaging Platforms"
-                  : "White, #323338, and black"}
-              </span>
+          <section className="preview-contexts">
+            <div className="preview-contexts-head">
+              <div className="preview-contexts-title">
+                <h3>{previewContextMode === "message" ? "Message Preview" : "Quick Previews"}</h3>
+                <span>
+                  {previewContextMode === "message"
+                    ? "Messaging Platforms"
+                    : "White, #323338, and black"}
+                </span>
+              </div>
+              <div className="preview-context-mode-toggle">
+                {PREVIEW_CONTEXT_OPTIONS.map((option) => (
+                  <button
+                    type="button"
+                    key={option.id}
+                    className={
+                      previewContextMode === option.id
+                        ? "preview-context-mode-button active"
+                        : "preview-context-mode-button"
+                    }
+                    onClick={() => setPreviewContextMode(option.id)}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="preview-context-mode-toggle">
-              {PREVIEW_CONTEXT_OPTIONS.map((option) => (
-                <button
-                  type="button"
-                  key={option.id}
-                  className={
-                    previewContextMode === option.id
-                      ? "preview-context-mode-button active"
-                      : "preview-context-mode-button"
-                  }
-                  onClick={() => setPreviewContextMode(option.id)}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          </div>
 
-          {previewContextMode === "surfaces" ? (
-            <div className="quick-preview-grid">
-              {QUICK_PREVIEW_SURFACES.map((surface) => (
-                <div key={surface.id} className={`quick-preview-tile ${surface.className}`}>
-                  <p className="quick-preview-label">{surface.label}</p>
-                  <div className="quick-preview-icon">
-                    <div
-                      className="context-icon-scale"
-                      style={{
-                        transform: `translate(-50%, -50%) scale(${quickPreviewScale})`,
-                      }}
-                    >
-                      {renderContextCompositeStack()}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="message-preview-shell">
-              <div className="message-preview-row">
-                <div className="message-preview-avatar" aria-hidden="true">
-                  <span className="message-preview-avatar-initial">A</span>
-                </div>
-
-                <div className="message-preview-content">
-                  <div className="message-preview-meta">
-                    <span className="message-preview-author">Username</span>
-                    <span className="message-preview-time">5:09 p.m.</span>
-                  </div>
-
-                  <p className="message-preview-line message-preview-line-inline-demo">
-                    Within text
-                    <span className="message-preview-inline-icon">
-                      <span
+            {previewContextMode === "surfaces" ? (
+              <div className="quick-preview-grid">
+                {QUICK_PREVIEW_SURFACES.map((surface) => (
+                  <div key={surface.id} className={`quick-preview-tile ${surface.className}`}>
+                    <p className="quick-preview-label">{surface.label}</p>
+                    <div className="quick-preview-icon">
+                      <div
                         className="context-icon-scale"
                         style={{
-                          transform: `translate(-50%, -50%) scale(${messageInlineScale})`,
+                          transform: `translate(-50%, -50%) scale(${quickPreviewScale})`,
                         }}
                       >
                         {renderContextCompositeStack()}
-                      </span>
-                    </span>
-                  </p>
-
-                  <div className="message-preview-large-icon">
-                    <span
-                      className="context-icon-scale"
-                      style={{
-                        transform: `translate(-50%, -50%) scale(${messageLargeScale})`,
-                      }}
-                    >
-                      {renderContextCompositeStack()}
-                    </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="message-preview-shell">
+                <div className="message-preview-row">
+                  <div className="message-preview-avatar" aria-hidden="true">
+                    <span className="message-preview-avatar-initial">A</span>
                   </div>
 
-                  <p className="message-preview-line message-preview-line-spaced">
-                    This message has a reaction
-                  </p>
-                  <div className="message-preview-reactions">
-                    <div className="message-preview-reaction message-preview-reaction-active">
-                      <span className="message-preview-reaction-icon">
+                  <div className="message-preview-content">
+                    <div className="message-preview-meta">
+                      <span className="message-preview-author">Username</span>
+                      <span className="message-preview-time">5:09 p.m.</span>
+                    </div>
+
+                    <p className="message-preview-line message-preview-line-inline-demo">
+                      Within text
+                      <span className="message-preview-inline-icon">
                         <span
                           className="context-icon-scale"
                           style={{
-                            transform: `translate(-50%, -50%) scale(${messageReactionScale})`,
+                            transform: `translate(-50%, -50%) scale(${messageInlineScale})`,
                           }}
                         >
                           {renderContextCompositeStack()}
                         </span>
                       </span>
-                      <span className="message-preview-reaction-count">1</span>
-                    </div>
-                    <div className="message-preview-reaction-add" aria-hidden="true">
-                      <svg
-                        viewBox="0 0 24 24"
-                        width="18"
-                        height="18"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.7"
+                    </p>
+
+                    <div className="message-preview-large-icon">
+                      <span
+                        className="context-icon-scale"
+                        style={{
+                          transform: `translate(-50%, -50%) scale(${messageLargeScale})`,
+                        }}
                       >
-                        <circle cx="12" cy="12" r="8" />
-                        <path d="M8.5 13.2c.9 1.1 2.1 1.6 3.5 1.6s2.6-.5 3.5-1.6" />
-                        <circle cx="9.3" cy="10.2" r="1" fill="currentColor" stroke="none" />
-                        <circle cx="14.7" cy="10.2" r="1" fill="currentColor" stroke="none" />
-                      </svg>
+                        {renderContextCompositeStack()}
+                      </span>
+                    </div>
+
+                    <p className="message-preview-line message-preview-line-spaced">
+                      This message has a reaction
+                    </p>
+                    <div className="message-preview-reactions">
+                      <div className="message-preview-reaction message-preview-reaction-active">
+                        <span className="message-preview-reaction-icon">
+                          <span
+                            className="context-icon-scale"
+                            style={{
+                              transform: `translate(-50%, -50%) scale(${messageReactionScale})`,
+                            }}
+                          >
+                            {renderContextCompositeStack()}
+                          </span>
+                        </span>
+                        <span className="message-preview-reaction-count">1</span>
+                      </div>
+                      <div className="message-preview-reaction-add" aria-hidden="true">
+                        <svg
+                          viewBox="0 0 24 24"
+                          width="18"
+                          height="18"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.7"
+                        >
+                          <circle cx="12" cy="12" r="8" />
+                          <path d="M8.5 13.2c.9 1.1 2.1 1.6 3.5 1.6s2.6-.5 3.5-1.6" />
+                          <circle cx="9.3" cy="10.2" r="1" fill="currentColor" stroke="none" />
+                          <circle cx="14.7" cy="10.2" r="1" fill="currentColor" stroke="none" />
+                        </svg>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
-        </section>
-      </main>
+            )}
+          </section>
+        </main>
+      </div>
 
       <section className="export-share-pane app-export-share-pane" aria-label="Export and sharing controls">
         <div className="export-share-pane-head">
@@ -5172,7 +5238,7 @@ function App() {
         <textarea
           value={loadCode}
           onChange={(event) => setLoadCode(event.target.value)}
-          placeholder="Paste IC10|... code or URL"
+          placeholder="Paste IC11|... code or URL"
         />
       </Modal>
 
