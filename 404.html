@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Iquan</title>
+  </head>
+  <body>
+    <script>
+      (function () {
+        var redirectKey = "iquan-spa-redirect";
+        var path = window.location.pathname || "/";
+        var segments = path.split("/").filter(Boolean);
+        var copiedLinkIndex = segments.lastIndexOf("copied-link");
+        var basePath =
+          copiedLinkIndex > 0 ? "/" + segments.slice(0, copiedLinkIndex).join("/") + "/" : "/";
+        var pendingRedirect = path + window.location.search + window.location.hash;
+
+        window.sessionStorage.setItem(redirectKey, pendingRedirect);
+        window.location.replace(basePath);
+      })();
+    </script>
+  </body>
+</html>
