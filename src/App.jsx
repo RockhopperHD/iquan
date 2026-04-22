@@ -3,22 +3,33 @@ import { toPng } from "html-to-image";
 import { Redo2, Trash2, Undo2 } from "lucide-react";
 import dynamicIconImports from "lucide-react/dynamicIconImports";
 
-const MODES = ["text", "icon", "image", "none"];
+const MODES = ["text", "icon", "image"];
 const MODE_TOGGLE_LABELS = {
   text: "Text",
   icon: "Icon",
   image: "Image",
+};
+const SHAPE_MODE_OPTIONS = ["shape", "image"];
+const SHAPE_MODE_LABELS = {
+  shape: "Shape",
+  image: "Image",
+};
+const SHAPE_PRESET_OPTIONS = ["square", "circle", "pill", "rectangle"];
+const SHAPES = ["shape", "image", "none", ...SHAPE_PRESET_OPTIONS];
+const SHAPE_TOGGLE_LABELS = {
+  square: "Square",
+  circle: "Circle",
+  pill: "Pill",
+  rectangle: "Rectangle",
+  image: "Image",
   none: "None",
 };
-const SHAPES = ["square", "circle", "pill", "rectangle", "image"];
 const AESTHETICS = ["flat"];
 const GRADIENT_TYPES = ["linear", "radial"];
 const MAX_GRADIENT_STOPS = 2;
 const MAX_BACK_DISTANCE = 32;
 const ICON_CODE_VERSION = "IC6";
 const SHARE_CODE_VERSION = "IC11";
-const IQUAN_LOGO_CODE =
-  "IC10|eyJiIjp7InQiOiJpcSIsIndzIjoxMDAsInIiOjQ2LCJmdyI6IjgwMCIsImYiOlsiI2ZmZmZmZiIsIiNiYWU5ZTMiXSwiZnQiOiJyYWRpYWwiLCJmeCI6MTcsImZ5IjoyMiwibyI6WyIjMDAwMDAwIiwiIzA0ODQ5NSJdLCJvYSI6MjQ2LCJvbCI6OX0sInAiOltbMiwtMzcsMzgseyJtIjoiaWNvbiIsImgiOiJjaXJjbGUiLCJ0IjoiaXEiLCJsIjoiaGVhcnQiLCJsdyI6My42LCJzIjo2NCwiaXMiOjYwLCJ3cyI6MTAwLCJyIjo0NiwiZnciOiI4MDAiLCJpbiI6MTQsImYiOlsiI2ZmOGE4YSJdLCJmdCI6InJhZGlhbCIsImZ4IjoxNywiZnkiOjIyLCJibyI6MCwidGMiOiIjZmY1YzVjIiwibyI6WyIjMDQ4NDk1Il0sIm9hIjoyNDYsIm9sIjowfV1dfQ";
 const PARTICLE_OFFSET_LIMIT = 120;
 const PARTICLE_EDIT_ZOOM = 1.65;
 const DEFAULT_CANVAS_SIZE = 500;
@@ -27,6 +38,9 @@ const CANVAS_SIZE_MIN = 320;
 const CANVAS_SIZE_MAX = 960;
 const ICON_BASE_SIZE_MIN = 64;
 const ICON_BASE_SIZE_MAX = 320;
+const SHAPE_HEIGHT_SCALE_MIN = 60;
+const SHAPE_HEIGHT_SCALE_MAX = 140;
+const SHAPE_RADIUS_MAX = 240;
 const ICON_BASE_SIZE_PRESETS = [128, 168, 240];
 const ICON_SCALE_MIN = 40;
 const ICON_SCALE_MAX = 140;
@@ -36,6 +50,36 @@ const EXPORT_SCALE_OPTIONS = [1, 2, 3];
 const DEFAULT_EXPORT_SCALE = 1;
 const CANVAS_SIZE_PRESETS = [400, 500, 640];
 const DEFAULT_PREVIEW_CONTEXT_MODE = "surfaces";
+const HERO_DESCRIPTION =
+  "Build polished icons fast with live previews, shareable links, and export-ready PNGs.";
+const LANDING_TO_BUILDER_MS = 1100;
+const HERO_SAMPLE_SWAP_MS = 3000;
+const HERO_SAMPLE_SWAP_DELAY_MS = 1200;
+const HERO_PRIMARY_ICON_SIZE = 252;
+const HERO_SAMPLE_LAYOUT = [
+  { left: "8%", top: "12%", size: 96, rotation: -8, delay: 40 },
+  { left: "22%", top: "11%", size: 98, rotation: 7, delay: 85 },
+  { left: "36%", top: "11%", size: 94, rotation: -6, delay: 130 },
+  { left: "50%", top: "11%", size: 100, rotation: 6, delay: 175 },
+  { left: "79%", top: "13%", size: 104, rotation: 8, delay: 220 },
+  { left: "92%", top: "14%", size: 96, rotation: -7, delay: 265 },
+  { left: "24%", top: "25%", size: 102, rotation: -9, delay: 290 },
+  { left: "74%", top: "24%", size: 108, rotation: 7, delay: 320 },
+  { left: "7%", top: "35%", size: 104, rotation: -9, delay: 310 },
+  { left: "20%", top: "42%", size: 100, rotation: 8, delay: 340 },
+  { left: "15%", top: "54%", size: 98, rotation: 8, delay: 355 },
+  { left: "24%", top: "66%", size: 104, rotation: -8, delay: 385 },
+  { left: "86%", top: "35%", size: 106, rotation: -8, delay: 400 },
+  { left: "78%", top: "46%", size: 104, rotation: 8, delay: 430 },
+  { left: "93%", top: "55%", size: 98, rotation: 7, delay: 445 },
+  { left: "78%", top: "66%", size: 106, rotation: -9, delay: 475 },
+  { left: "9%", top: "83%", size: 102, rotation: -7, delay: 490 },
+  { left: "24%", top: "86%", size: 96, rotation: 8, delay: 535 },
+  { left: "39%", top: "86%", size: 100, rotation: -8, delay: 580 },
+  { left: "61%", top: "86%", size: 100, rotation: 7, delay: 625 },
+  { left: "76%", top: "86%", size: 98, rotation: -7, delay: 670 },
+  { left: "90%", top: "84%", size: 96, rotation: 6, delay: 715 },
+];
 const PARTICLE_CORNERS = [
   { key: "topLeft", label: "Top Left" },
   { key: "topMiddle", label: "Top Middle" },
@@ -71,13 +115,16 @@ const HISTORY_LIMIT = 100;
 
 const DEFAULT_STATE = {
   mode: "text",
-  shape: "square",
+  contentEnabled: true,
+  shape: "shape",
+  shapeEnabled: true,
   content: "A",
   lucide: "sparkles",
   lucideWeight: 1.9,
   size: 168,
   iconScale: 100,
-  widthScale: 160,
+  widthScale: 100,
+  heightScale: 100,
   pillWidthScale: 170,
   pillHeightScale: 72,
   radius: 24,
@@ -106,6 +153,7 @@ const DEFAULT_STATE = {
   strokeGradientCenterY: 50,
   backColor: "#c8d2e6",
   outline: 2,
+  backLayerEnabled: true,
   backDistance: 0,
   backAngle: 45,
   imageData: "",
@@ -185,15 +233,560 @@ const PREVIEW_CONTEXT_OPTIONS = [
   { id: "surfaces", label: "Surfaces" },
   { id: "message", label: "Message + reaction" },
 ];
+const HERO_SAMPLE_BLUEPRINTS = [
+  {
+    key: "sparkles-circle",
+    mode: "icon",
+    lucide: "sparkles",
+    lucideWeight: 1.3,
+    shape: "circle",
+    size: 152,
+    iconScale: 60,
+    fillStops: ["#fff4cf", "#ffd79a"],
+    strokeStops: ["#f59e0b"],
+    textColor: "#b45309",
+    outline: 6,
+    backColor: "#fde68a",
+    backDistance: 10,
+    backAngle: 42,
+  },
+  {
+    key: "bolt-square",
+    mode: "icon",
+    lucide: "zap",
+    lucideWeight: 2.8,
+    shape: "square",
+    size: 148,
+    iconScale: 62,
+    radius: 28,
+    fillStops: ["#eff6ff", "#c7d2fe"],
+    strokeStops: ["#818cf8"],
+    textColor: "#4f46e5",
+    outline: 5,
+    backColor: "#a5b4fc",
+    backDistance: 8,
+    backAngle: 36,
+  },
+  {
+    key: "message-pill",
+    mode: "icon",
+    lucide: "message-circle",
+    lucideWeight: 1.2,
+    shape: "pill",
+    size: 156,
+    iconScale: 56,
+    pillWidthScale: 194,
+    pillHeightScale: 74,
+    fillStops: ["#f0fdf4", "#bbf7d0"],
+    strokeStops: ["#34d399"],
+    textColor: "#047857",
+    outline: 4,
+    backColor: "#86efac",
+    backDistance: 8,
+    backAngle: 24,
+  },
+  {
+    key: "wave-text",
+    mode: "text",
+    content: "~",
+    shape: "circle",
+    size: 146,
+    fontSize: 96,
+    fontWeight: "900",
+    fillStops: ["#eff6ff", "#dbeafe"],
+    strokeStops: ["#38bdf8"],
+    textColor: "#0284c7",
+    outline: 5,
+    backColor: "#7dd3fc",
+    backDistance: 6,
+    backAngle: 55,
+  },
+  {
+    key: "asterisk-text",
+    mode: "text",
+    content: "*",
+    shape: "square",
+    size: 144,
+    radius: 26,
+    fontSize: 92,
+    fontWeight: "900",
+    fillStops: ["#fff1f2", "#fecdd3"],
+    strokeStops: ["#fb7185"],
+    textColor: "#e11d48",
+    outline: 4,
+    backColor: "#fda4af",
+    backDistance: 10,
+    backAngle: 35,
+  },
+  {
+    key: "play-rectangle",
+    mode: "icon",
+    lucide: "play",
+    lucideWeight: 1,
+    shape: "rectangle",
+    size: 158,
+    iconScale: 50,
+    widthScale: 188,
+    radius: 26,
+    fillStops: ["#f5f3ff", "#ddd6fe"],
+    strokeStops: ["#a78bfa"],
+    textColor: "#7c3aed",
+    outline: 5,
+    backColor: "#c4b5fd",
+    backDistance: 8,
+    backAngle: 18,
+  },
+  {
+    key: "ok-pill",
+    mode: "text",
+    content: "OK",
+    shape: "pill",
+    size: 150,
+    pillWidthScale: 202,
+    pillHeightScale: 76,
+    fontSize: 62,
+    fontWeight: "900",
+    fillStops: ["#ecfeff", "#bae6fd"],
+    strokeStops: ["#22d3ee"],
+    textColor: "#0f766e",
+    outline: 4,
+    backColor: "#67e8f9",
+    backDistance: 8,
+    backAngle: 26,
+  },
+  {
+    key: "heart-circle",
+    mode: "icon",
+    lucide: "heart",
+    lucideWeight: 2.4,
+    shape: "circle",
+    size: 150,
+    iconScale: 58,
+    fillStops: ["#fff1f2", "#fecdd3"],
+    strokeStops: ["#fb7185"],
+    textColor: "#f43f5e",
+    outline: 5,
+    backColor: "#fda4af",
+    backDistance: 10,
+    backAngle: 28,
+  },
+  {
+    key: "sun-square",
+    mode: "icon",
+    lucide: "sun",
+    lucideWeight: 1.1,
+    shape: "square",
+    size: 148,
+    iconScale: 58,
+    radius: 24,
+    fillStops: ["#fefce8", "#fde68a"],
+    strokeStops: ["#facc15"],
+    textColor: "#ca8a04",
+    outline: 4,
+    backColor: "#fde047",
+    backDistance: 8,
+    backAngle: 48,
+  },
+  {
+    key: "go-text",
+    mode: "text",
+    content: "Go",
+    shape: "rectangle",
+    size: 156,
+    widthScale: 184,
+    radius: 24,
+    fontSize: 60,
+    fontWeight: "800",
+    fillStops: ["#ecfdf5", "#bbf7d0"],
+    strokeStops: ["#34d399"],
+    textColor: "#047857",
+    outline: 4,
+    backColor: "#86efac",
+    backDistance: 8,
+    backAngle: 22,
+  },
+  {
+    key: "star-circle",
+    mode: "icon",
+    lucide: "star",
+    lucideWeight: 1.2,
+    shape: "circle",
+    size: 146,
+    iconScale: 60,
+    fillStops: ["#fff7ed", "#fed7aa"],
+    strokeStops: ["#fb923c"],
+    textColor: "#ea580c",
+    outline: 5,
+    backColor: "#fdba74",
+    backDistance: 9,
+    backAngle: 34,
+  },
+  {
+    key: "moon-badge-particle",
+    base: {
+      mode: "icon",
+      lucide: "moon",
+      lucideWeight: 2.6,
+      shape: "circle",
+      size: 148,
+      iconScale: 60,
+      fillStops: ["#f8fafc", "#dbeafe"],
+      strokeStops: ["#60a5fa"],
+      textColor: "#2563eb",
+      outline: 4,
+      backColor: "#93c5fd",
+      backDistance: 8,
+      backAngle: 28,
+    },
+    particles: {
+      topRight: createHeroParticle(
+        {
+          mode: "text",
+          content: "+",
+          shape: "circle",
+          size: 68,
+          fontSize: 44,
+          fontWeight: "900",
+          fillStops: ["#fff7ed", "#fed7aa"],
+          strokeStops: ["#fb923c"],
+          textColor: "#ea580c",
+          outline: 3,
+        },
+        8,
+        -8,
+      ),
+    },
+  },
+  {
+    key: "idea-chip",
+    mode: "icon",
+    lucide: "lightbulb",
+    lucideWeight: 1.5,
+    shape: "pill",
+    size: 152,
+    iconScale: 54,
+    pillWidthScale: 192,
+    pillHeightScale: 78,
+    fillStops: ["#fefce8", "#fde68a"],
+    strokeStops: ["#facc15"],
+    textColor: "#ca8a04",
+    outline: 4,
+    backColor: "#fde047",
+    backDistance: 8,
+    backAngle: 18,
+  },
+  {
+    key: "grid-plus",
+    base: {
+      mode: "icon",
+      lucide: "layout-grid",
+      lucideWeight: 1.6,
+      shape: "square",
+      size: 144,
+      iconScale: 56,
+      radius: 26,
+      fillStops: ["#eff6ff", "#dbeafe"],
+      strokeStops: ["#38bdf8"],
+      textColor: "#0f766e",
+      outline: 4,
+      backColor: "#7dd3fc",
+      backDistance: 8,
+      backAngle: 40,
+    },
+    particles: {
+      bottomRight: createHeroParticle(
+        {
+          mode: "icon",
+          lucide: "plus",
+          shape: "circle",
+          size: 62,
+          fillStops: ["#ecfdf5", "#bbf7d0"],
+          strokeStops: ["#4ade80"],
+          textColor: "#16a34a",
+          outline: 3,
+        },
+        8,
+        8,
+      ),
+    },
+  },
+  {
+    key: "hash-note",
+    mode: "text",
+    content: "#",
+    shape: "square",
+    size: 148,
+    radius: 24,
+    fontSize: 80,
+    fontWeight: "900",
+    fillStops: ["#f5f3ff", "#e9d5ff"],
+    strokeStops: ["#c084fc"],
+    textColor: "#7c3aed",
+    outline: 4,
+    backColor: "#d8b4fe",
+    backDistance: 8,
+    backAngle: 26,
+  },
+  {
+    key: "camera-card",
+    mode: "icon",
+    lucide: "camera",
+    lucideWeight: 1.8,
+    shape: "rectangle",
+    size: 156,
+    iconScale: 54,
+    widthScale: 186,
+    radius: 24,
+    fillStops: ["#f8fafc", "#e2e8f0"],
+    strokeStops: ["#94a3b8"],
+    textColor: "#475569",
+    outline: 4,
+    backColor: "#cbd5e1",
+    backDistance: 8,
+    backAngle: 20,
+  },
+  {
+    key: "chat-burst",
+    base: {
+      mode: "icon",
+      lucide: "message-circle-more",
+      lucideWeight: 1.4,
+      shape: "pill",
+      size: 150,
+      iconScale: 54,
+      pillWidthScale: 190,
+      pillHeightScale: 78,
+      fillStops: ["#ecfeff", "#a5f3fc"],
+      strokeStops: ["#22d3ee"],
+      textColor: "#0891b2",
+      outline: 4,
+      backColor: "#67e8f9",
+      backDistance: 8,
+      backAngle: 24,
+    },
+    particles: {
+      topLeft: createHeroParticle(
+        {
+          mode: "text",
+          content: "!",
+          shape: "circle",
+          size: 64,
+          fontSize: 42,
+          fontWeight: "900",
+          fillStops: ["#fff1f2", "#fecdd3"],
+          strokeStops: ["#fb7185"],
+          textColor: "#e11d48",
+          outline: 3,
+        },
+        -8,
+        -8,
+      ),
+    },
+  },
+  {
+    key: "terminal-hard-outline",
+    mode: "icon",
+    lucide: "terminal",
+    lucideWeight: 3.8,
+    shape: "square",
+    size: 150,
+    iconScale: 54,
+    radius: 20,
+    fillStops: ["#fefefe", "#e5e7eb"],
+    strokeStops: ["#111111"],
+    textColor: "#111111",
+    outline: 8,
+    backColor: "#111111",
+    backDistance: 10,
+    backAngle: 36,
+  },
+  {
+    key: "compass-ring",
+    mode: "icon",
+    lucide: "compass",
+    lucideWeight: 2.4,
+    shape: "circle",
+    size: 154,
+    iconScale: 56,
+    fillStops: ["#ffffff", "#e2e8f0"],
+    strokeStops: ["#0f172a"],
+    textColor: "#0f172a",
+    outline: 7,
+    backColor: "#cbd5e1",
+    backDistance: 4,
+    backAngle: 90,
+  },
+  {
+    key: "music-burst",
+    mode: "icon",
+    lucide: "music-4",
+    lucideWeight: 1.1,
+    shape: "circle",
+    size: 144,
+    iconScale: 52,
+    fillStops: ["#fdf4ff", "#f5d0fe"],
+    fillGradientType: "radial",
+    strokeStops: ["#d946ef"],
+    textColor: "#a21caf",
+    outline: 6,
+    backColor: "#f0abfc",
+    backDistance: 12,
+    backAngle: 30,
+  },
+  {
+    key: "mail-stamp",
+    mode: "icon",
+    lucide: "mail",
+    lucideWeight: 2.2,
+    shape: "rectangle",
+    size: 160,
+    iconScale: 50,
+    widthScale: 194,
+    radius: 16,
+    fillStops: ["#fff7ed", "#ffedd5"],
+    strokeStops: ["#7c2d12"],
+    textColor: "#7c2d12",
+    outline: 8,
+    backColor: "#fdba74",
+    backDistance: 10,
+    backAngle: 18,
+  },
+  {
+    key: "question-bubble",
+    mode: "text",
+    content: "?",
+    shape: "pill",
+    size: 154,
+    pillWidthScale: 186,
+    pillHeightScale: 74,
+    fontSize: 66,
+    fontWeight: "1000",
+    fillStops: ["#eff6ff", "#bfdbfe"],
+    strokeStops: ["#1d4ed8"],
+    textColor: "#1d4ed8",
+    outline: 7,
+    backColor: "#60a5fa",
+    backDistance: 10,
+    backAngle: 20,
+  },
+  {
+    key: "bookmark-tag",
+    mode: "icon",
+    lucide: "bookmark",
+    lucideWeight: 2.9,
+    shape: "rectangle",
+    size: 154,
+    iconScale: 46,
+    widthScale: 168,
+    radius: 22,
+    fillStops: ["#ecfccb", "#d9f99d"],
+    strokeStops: ["#3f6212"],
+    textColor: "#3f6212",
+    outline: 7,
+    backColor: "#84cc16",
+    backDistance: 9,
+    backAngle: 42,
+  },
+  {
+    key: "smile-chip",
+    mode: "icon",
+    lucide: "smile-plus",
+    lucideWeight: 1.4,
+    shape: "pill",
+    size: 148,
+    iconScale: 52,
+    pillWidthScale: 188,
+    pillHeightScale: 72,
+    fillStops: ["#ecfeff", "#cffafe"],
+    strokeStops: ["#0f172a"],
+    textColor: "#0f766e",
+    outline: 6,
+    backColor: "#67e8f9",
+    backDistance: 8,
+    backAngle: 18,
+  },
+  {
+    key: "lowercase-monogram",
+    mode: "text",
+    content: "iq",
+    shape: "square",
+    size: 150,
+    radius: 30,
+    fontSize: 54,
+    fontWeight: "800",
+    fillStops: ["#f8fafc", "#dbeafe"],
+    strokeStops: ["#111827"],
+    textColor: "#111827",
+    outline: 7,
+    backColor: "#94a3b8",
+    backDistance: 10,
+    backAngle: 35,
+  },
+  {
+    key: "orbit-particle",
+    base: {
+      mode: "icon",
+      lucide: "circle-dot",
+      lucideWeight: 2.2,
+      shape: "circle",
+      size: 148,
+      iconScale: 58,
+      fillStops: ["#fff7ed", "#ffedd5"],
+      strokeStops: ["#fb923c"],
+      textColor: "#9a3412",
+      outline: 6,
+      backColor: "#fdba74",
+      backDistance: 8,
+      backAngle: 26,
+    },
+    particles: {
+      topLeft: createHeroParticle(
+        {
+          mode: "icon",
+          lucide: "sparkles",
+          lucideWeight: 1.4,
+          shape: "circle",
+          size: 58,
+          iconScale: 56,
+          fillStops: ["#ffffff", "#fef3c7"],
+          strokeStops: ["#f59e0b"],
+          textColor: "#d97706",
+          outline: 3,
+        },
+        -12,
+        -10,
+      ),
+      bottomRight: createHeroParticle(
+        {
+          mode: "text",
+          content: "•",
+          shape: "circle",
+          size: 50,
+          fontSize: 32,
+          fontWeight: "900",
+          fillStops: ["#ffffff", "#fbcfe8"],
+          strokeStops: ["#ec4899"],
+          textColor: "#db2777",
+          outline: 3,
+        },
+        10,
+        12,
+      ),
+    },
+  },
+];
 const COMPACT_ICON_FIELDS = [
   ["mode", "m"],
+  ["contentEnabled", "me"],
   ["shape", "h"],
+  ["shapeEnabled", "he"],
   ["content", "t"],
   ["lucide", "l"],
   ["lucideWeight", "lw"],
   ["size", "s"],
   ["iconScale", "is"],
   ["widthScale", "ws"],
+  ["heightScale", "hs"],
   ["pillWidthScale", "pw"],
   ["pillHeightScale", "ph"],
   ["radius", "r"],
@@ -218,6 +811,7 @@ const COMPACT_ICON_FIELDS = [
   ["strokeGradientCenterY", "oy"],
   ["backColor", "bc"],
   ["outline", "ol"],
+  ["backLayerEnabled", "ble"],
   ["backDistance", "bd"],
   ["backAngle", "ba"],
   ["imageData", "id"],
@@ -277,12 +871,12 @@ function normalizeMode(value) {
     .trim()
     .toLowerCase();
   if (normalized === "lucide") return "icon";
+  if (normalized === "none") return "none";
   return MODES.includes(normalized) ? normalized : DEFAULT_STATE.mode;
 }
 
 function getShapeRadius(shape, width, height, radius) {
-  if (shape === "circle") return Math.min(width, height) / 2;
-  if (shape === "pill") return height / 2;
+  if (shape === "none") return 0;
   return clamp(radius, 0, Math.min(width, height) / 2);
 }
 
@@ -319,7 +913,7 @@ function getTextOpticalOffset(text, fontSize, fontWeight, fontFamily) {
 }
 
 function getContentDrivenWidth(state, fontSize, minWidth, visibleOutline) {
-  if (state.mode === "icon" || state.mode === "none") return minWidth;
+  if (!state.contentEnabled || state.mode === "icon" || state.mode === "none") return minWidth;
   const measured = measureTextWidth(
     state.content || " ",
     fontSize,
@@ -335,26 +929,10 @@ function getContentDrivenWidth(state, fontSize, minWidth, visibleOutline) {
 
 function getDimensions(state, fontSize, visibleOutline) {
   const base = state.size;
-
-  if (state.shape === "circle") {
-    return { width: base, height: base };
-  }
-
-  if (state.shape === "pill") {
-    const height = Math.round(base * (state.pillHeightScale / 100));
-    const minimumWidth = Math.round(base * (state.pillWidthScale / 100));
+  if (state.shape === "shape") {
     return {
-      width: getContentDrivenWidth(state, fontSize, minimumWidth, visibleOutline),
-      height,
-    };
-  }
-
-  if (state.shape === "rectangle") {
-    const height = base;
-    const minimumWidth = Math.round(base * (state.widthScale / 100));
-    return {
-      width: getContentDrivenWidth(state, fontSize, minimumWidth, visibleOutline),
-      height,
+      width: Math.max(1, Math.round(base * (state.widthScale / 100))),
+      height: Math.max(1, Math.round(base * (state.heightScale / 100))),
     };
   }
 
@@ -366,17 +944,30 @@ function fitTextSize(state, visibleOutline) {
     return Math.round(state.size * 0.48 * (state.iconScale / 100));
   }
 
+  const getTextFitBounds = (dimensions) => {
+    const innerWidth = Math.max(
+      1,
+      dimensions.width - state.inset * 2 - visibleOutline * 2,
+    );
+    const innerHeight = Math.max(
+      1,
+      dimensions.height - state.inset * 2 - visibleOutline * 2,
+    );
+    const widthSlack = Math.min(14, Math.max(2, Math.round(innerWidth * 0.14)));
+    const heightSlack = Math.min(12, Math.max(2, Math.round(innerHeight * 0.12)));
+
+    return {
+      width: Math.max(1, innerWidth - widthSlack),
+      height: Math.max(1, innerHeight - heightSlack),
+    };
+  };
+
   const doesTextFit = (fontSize) => {
     const dimensions = getDimensions(state, fontSize, visibleOutline);
     const iconScale = state.iconScale / 100;
-    const safeWidth = Math.max(
-      1,
-      (dimensions.width - state.inset * 2 - visibleOutline * 2 - 14) * iconScale,
-    );
-    const safeHeight = Math.max(
-      1,
-      (dimensions.height - state.inset * 2 - visibleOutline * 2 - 12) * iconScale,
-    );
+    const fitBounds = getTextFitBounds(dimensions);
+    const safeWidth = Math.max(1, fitBounds.width * iconScale);
+    const safeHeight = Math.max(1, fitBounds.height * iconScale);
     const measured = measureTextWidth(
       state.content || " ",
       fontSize,
@@ -529,6 +1120,28 @@ function clampCropDraft(draft, width, height) {
     size: safeSize,
     x: clamp(parseFloatOr(draft?.x, 0), 0, maxX),
     y: clamp(parseFloatOr(draft?.y, 0), 0, maxY),
+  };
+}
+
+function getExportDimensionsFromImageState(imageState) {
+  if (!imageState?.imageData) return null;
+
+  const safeWidth = Math.max(1, parseIntOr(imageState.imageWidth, 0));
+  const safeHeight = Math.max(1, parseIntOr(imageState.imageHeight, 0));
+
+  if (imageState.imageCropEnabled) {
+    const cropSize = clamp(
+      parseFloatOr(imageState.imageCropSize, IMAGE_CROP_SIZE_MAX),
+      IMAGE_CROP_SIZE_MIN,
+      IMAGE_CROP_SIZE_MAX,
+    );
+    const squareSize = Math.max(1, Math.round(Math.min(safeWidth, safeHeight) * cropSize));
+    return { width: squareSize, height: squareSize };
+  }
+
+  return {
+    width: safeWidth,
+    height: safeHeight,
   };
 }
 
@@ -867,6 +1480,10 @@ async function normalizeUploadedImage(file) {
 
 function sanitizeIconState(value) {
   const source = value || {};
+  const rawMode = normalizeMode(source.mode);
+  const rawShape = SHAPES.includes(source.shape) ? source.shape : DEFAULT_STATE.shape;
+  const contentEnabled = source.contentEnabled !== false && rawMode !== "none";
+  const shapeEnabled = source.shapeEnabled !== false && rawShape !== "none";
   const imageData = sanitizeImageData(source.imageData);
   const imageName = imageData
     ? sanitizeFilename(source.imageName, "image")
@@ -925,8 +1542,13 @@ function sanitizeIconState(value) {
   strokeStops[0] = resolvedStroke;
 
   return {
-    mode: normalizeMode(source.mode),
-    shape: SHAPES.includes(source.shape) ? source.shape : DEFAULT_STATE.shape,
+    mode: contentEnabled ? rawMode : DEFAULT_STATE.mode,
+    contentEnabled,
+    shape:
+      shapeEnabled && rawShape === "image"
+        ? rawShape
+        : DEFAULT_STATE.shape,
+    shapeEnabled,
     content: String(source.content ?? DEFAULT_STATE.content).slice(0, 12),
     lucide:
       normalizeLucideName(String(source.lucide ?? DEFAULT_STATE.lucide)) ||
@@ -943,9 +1565,24 @@ function sanitizeIconState(value) {
       ICON_SCALE_MAX,
     ),
     widthScale: clamp(
-      parseIntOr(source.widthScale, DEFAULT_STATE.widthScale),
-      100,
+      parseIntOr(
+        source.widthScale,
+        rawShape === "rectangle"
+          ? parseIntOr(source.widthScale, 160)
+          : rawShape === "pill"
+            ? parseIntOr(source.pillWidthScale, 170)
+            : DEFAULT_STATE.widthScale,
+      ),
+      ICON_SCALE_MIN,
       260,
+    ),
+    heightScale: clamp(
+      parseIntOr(
+        source.heightScale,
+        rawShape === "pill" ? parseIntOr(source.pillHeightScale, 72) : DEFAULT_STATE.heightScale,
+      ),
+      SHAPE_HEIGHT_SCALE_MIN,
+      SHAPE_HEIGHT_SCALE_MAX,
     ),
     pillWidthScale: clamp(
       parseIntOr(source.pillWidthScale, DEFAULT_STATE.pillWidthScale),
@@ -957,7 +1594,10 @@ function sanitizeIconState(value) {
       60,
       110,
     ),
-    radius: clamp(parseIntOr(source.radius, DEFAULT_STATE.radius), 0, 80),
+    radius:
+      rawShape === "circle" || rawShape === "pill"
+        ? SHAPE_RADIUS_MAX
+        : clamp(parseIntOr(source.radius, DEFAULT_STATE.radius), 0, SHAPE_RADIUS_MAX),
     fontSize: clamp(parseIntOr(source.fontSize, DEFAULT_STATE.fontSize), 16, 180),
     linkTextToSize: source.linkTextToSize !== false,
     spacing: clamp(parseIntOr(source.spacing, DEFAULT_STATE.spacing), 0, 20),
@@ -1029,6 +1669,7 @@ function sanitizeIconState(value) {
     ),
     backColor: sanitizeHexColor(source.backColor, DEFAULT_STATE.backColor),
     outline: clamp(parseIntOr(source.outline, DEFAULT_STATE.outline), 0, 24),
+    backLayerEnabled: source.backLayerEnabled !== false,
     backDistance: clamp(
       parseIntOr(source.backDistance, DEFAULT_STATE.backDistance),
       0,
@@ -1235,7 +1876,7 @@ function createDefaultParticleIcon(baseIcon) {
   return sanitizeIconState({
     ...baseIcon,
     size: clamp(Math.round(baseIcon.size * 0.42), 64, 220),
-    shape: ["rectangle", "image"].includes(baseIcon.shape) ? "square" : baseIcon.shape,
+    shape: baseIcon.shape === "image" || baseIcon.shape === "none" ? "shape" : baseIcon.shape,
     backDistance: 0,
   });
 }
@@ -1258,6 +1899,10 @@ function createDefaultParticle(baseIcon, corner) {
     offsetY: defaultOffset.y,
     icon: createDefaultParticleIcon(baseIcon),
   };
+}
+
+function getCornerLabel(cornerKey) {
+  return PARTICLE_CORNERS.find((corner) => corner.key === cornerKey)?.label || cornerKey;
 }
 
 function sanitizeParticle(value, baseIcon) {
@@ -1307,8 +1952,28 @@ function stripImagePayloadFromIconState(iconState) {
   };
 }
 
-function iconStateHasEmbeddedImages(iconState) {
-  return Boolean(iconState.imageData || iconState.baseImageData);
+function iconStateUsesImageBacking(iconState) {
+  const usesContentImage = iconState.contentEnabled !== false && iconState.mode === "image";
+  const usesShapeImage = iconState.shapeEnabled !== false && iconState.shape === "image";
+  return usesContentImage || usesShapeImage;
+}
+
+function iconStateHasMissingSharedImages(iconState) {
+  const usesContentImage = iconState.contentEnabled !== false && iconState.mode === "image";
+  const usesShapeImage = iconState.shapeEnabled !== false && iconState.shape === "image";
+  return (usesContentImage && !iconState.imageData) || (usesShapeImage && !iconState.baseImageData);
+}
+
+function compositionUsesImageBacking(baseState, particles) {
+  if (iconStateUsesImageBacking(baseState)) return true;
+  return Object.values(particles || {}).some((particle) => iconStateUsesImageBacking(particle.icon));
+}
+
+function compositionHasMissingSharedImages(baseState, particles) {
+  if (iconStateHasMissingSharedImages(baseState)) return true;
+  return Object.values(particles || {}).some((particle) =>
+    iconStateHasMissingSharedImages(particle.icon),
+  );
 }
 
 function encodeIconState(state) {
@@ -1488,6 +2153,32 @@ function getCanonicalBasePath(basePath) {
   return normalizeBasePath(runtimeBasePath);
 }
 
+function normalizePathnameForMatch(value) {
+  const rawValue = String(value || "").trim();
+  if (!rawValue || rawValue === "/") return "/";
+  const withLeadingSlash = rawValue.startsWith("/") ? rawValue : `/${rawValue}`;
+  const collapsed = withLeadingSlash.replace(/\/{2,}/g, "/");
+  return collapsed.length > 1 ? collapsed.replace(/\/+$/, "") : collapsed;
+}
+
+function getSharePath(destination = "editor", basePath) {
+  const canonicalBasePath = getCanonicalBasePath(basePath);
+  if (destination === "copiedLink") {
+    const baseWithoutTrailingSlash =
+      canonicalBasePath === "/" ? "" : canonicalBasePath.replace(/\/$/, "");
+    return `${baseWithoutTrailingSlash}/copied-link`;
+  }
+  return canonicalBasePath;
+}
+
+function resolvePageModeFromUrl(url, options = {}) {
+  const normalizedPathname = normalizePathnameForMatch(url?.pathname);
+  const copiedLinkPath = normalizePathnameForMatch(
+    getSharePath("copiedLink", options.basePath),
+  );
+  return normalizedPathname === copiedLinkPath ? "copiedLink" : "editor";
+}
+
 function extractShareCodeFromSearch(url) {
   const namedSearchCode = url.searchParams.get("code") || url.searchParams.get("c");
   if (isShareCodeFormat(namedSearchCode)) return namedSearchCode.trim();
@@ -1546,10 +2237,11 @@ function resolveShareCodeInput(input) {
   return inlineCodeMatch ? inlineCodeMatch[0] : trimmed;
 }
 
-function resolveUrlHydration(url, fallbackCode) {
+function resolveUrlHydration(url, fallbackCode, options = {}) {
+  const pageMode = resolvePageModeFromUrl(url, options);
   const codeFromUrl = extractShareCodeFromUrl(url);
   if (!codeFromUrl) {
-    return { status: "missing", shareCode: fallbackCode };
+    return { status: "missing", shareCode: fallbackCode, pageMode };
   }
 
   try {
@@ -1558,12 +2250,18 @@ function resolveUrlHydration(url, fallbackCode) {
       status: "valid",
       shareCode: codeFromUrl,
       decoded,
+      missingSharedImages: compositionHasMissingSharedImages(
+        decoded.base,
+        decoded.particles,
+      ),
+      pageMode,
     };
   } catch {
     return {
       status: "invalid",
       invalidCode: codeFromUrl,
       shareCode: fallbackCode,
+      pageMode,
     };
   }
 }
@@ -1575,9 +2273,11 @@ function createShareUrl(code, options = {}) {
   const fallbackOrigin = hasWindow ? window.location.origin : "https://example.com";
   const url = new URL(currentUrl, fallbackOrigin);
 
-  url.pathname = getCanonicalBasePath(options.basePath);
+  url.pathname = getSharePath(options.destination || "editor", options.basePath);
   url.search = "";
-  url.searchParams.set("code", code);
+  if (code) {
+    url.searchParams.set("code", code);
+  }
   url.hash = "";
   return url.toString();
 }
@@ -1714,23 +2414,144 @@ function getCompositeBounds(baseMetrics, particleLayers) {
   return { minX, minY, maxX, maxY, width: maxX - minX, height: maxY - minY };
 }
 
-function getCompositionLayout(bounds, targetSize, safeMargin, allowUpscale) {
-  const availableSize = Math.max(1, targetSize - safeMargin * 2);
+function getCompositionLayout(bounds, targetWidth, targetHeight, safeMargin, allowUpscale) {
+  const availableWidth = Math.max(1, targetWidth - safeMargin * 2);
+  const availableHeight = Math.max(1, targetHeight - safeMargin * 2);
   const fitScale = Math.min(
-    availableSize / Math.max(1, bounds.width),
-    availableSize / Math.max(1, bounds.height),
+    availableWidth / Math.max(1, bounds.width),
+    availableHeight / Math.max(1, bounds.height),
   );
   const scale = allowUpscale ? fitScale : Math.min(1, fitScale);
 
   return {
     scale,
-    offsetX: (targetSize - bounds.width * scale) / 2 - bounds.minX * scale,
-    offsetY: (targetSize - bounds.height * scale) / 2 - bounds.minY * scale,
+    offsetX: (targetWidth - bounds.width * scale) / 2 - bounds.minX * scale,
+    offsetY: (targetHeight - bounds.height * scale) / 2 - bounds.minY * scale,
   };
 }
 
 function getContextScale(targetSize, bounds) {
   return targetSize / Math.max(1, Math.max(bounds.width, bounds.height));
+}
+
+function buildParticleLayers(baseMetrics, particles) {
+  const layers = [];
+  for (const corner of PARTICLE_CORNERS) {
+    const particle = particles[corner.key];
+    if (!particle) continue;
+    const metrics = getIconMetrics(particle.icon);
+    const placement = getParticlePlacement(
+      corner.key,
+      baseMetrics.dimensions,
+      metrics.dimensions,
+      particle.offsetX,
+      particle.offsetY,
+    );
+
+    layers.push({
+      ...corner,
+      particle,
+      metrics,
+      placement,
+    });
+  }
+  return layers;
+}
+
+function buildCornerPoints(baseMetrics) {
+  return PARTICLE_CORNERS.map((corner) => ({
+    ...corner,
+    point: getCornerPoint(
+      corner.key,
+      baseMetrics.dimensions.width,
+      baseMetrics.dimensions.height,
+    ),
+    float: getHotspotFloat(
+      corner.key,
+      baseMetrics.dimensions.width,
+      baseMetrics.dimensions.height,
+    ),
+  }));
+}
+
+function createHeroParticle(iconPatch, offsetX = 0, offsetY = 0) {
+  return {
+    offsetX,
+    offsetY,
+    icon: sanitizeIconState({
+      ...DEFAULT_STATE,
+      ...iconPatch,
+    }),
+  };
+}
+
+function applyHeroIconVariation(iconState) {
+  if (iconState.mode !== "icon") {
+    return sanitizeIconState(iconState);
+  }
+
+  const lucideWeightChoices = [0.9, 1.2, 1.6, 2.1, 2.8, 3.8, 5.1, 6.8];
+  const iconScaleDeltaChoices = [-8, -4, 0, 4, 8];
+  const outlineDeltaChoices = [-1, 0, 1, 2];
+  const weightChoice =
+    lucideWeightChoices[Math.floor(Math.random() * lucideWeightChoices.length)] ||
+    iconState.lucideWeight;
+  const iconScaleDelta =
+    iconScaleDeltaChoices[Math.floor(Math.random() * iconScaleDeltaChoices.length)] || 0;
+  const outlineDelta =
+    outlineDeltaChoices[Math.floor(Math.random() * outlineDeltaChoices.length)] || 0;
+
+  return sanitizeIconState({
+    ...iconState,
+    lucideWeight: clamp(weightChoice, LUCIDE_WEIGHT_MIN, LUCIDE_WEIGHT_MAX),
+    iconScale: clamp(
+      parseIntOr(iconState.iconScale, DEFAULT_STATE.iconScale) + iconScaleDelta,
+      ICON_SCALE_MIN,
+      ICON_SCALE_MAX,
+    ),
+    outline: clamp(parseIntOr(iconState.outline, DEFAULT_STATE.outline) + outlineDelta, 0, 24),
+  });
+}
+
+function createHeroSampleState(blueprint) {
+  const sampleBase = blueprint.base || blueprint;
+  const normalized = sanitizeIconState({
+    ...DEFAULT_STATE,
+    ...sampleBase,
+    iconScale:
+      sampleBase.mode === "icon"
+        ? parseIntOr(sampleBase.iconScale, 74)
+        : parseIntOr(sampleBase.iconScale, DEFAULT_STATE.iconScale),
+  });
+  return applyHeroIconVariation(normalized);
+}
+
+function createHeroSampleItem(index, previousBlueprintKey = "") {
+  const availableBlueprints = HERO_SAMPLE_BLUEPRINTS.filter(
+    (blueprint) => blueprint.key !== previousBlueprintKey,
+  );
+  const source = availableBlueprints.length > 0 ? availableBlueprints : HERO_SAMPLE_BLUEPRINTS;
+  const blueprint = source[Math.floor(Math.random() * source.length)] || HERO_SAMPLE_BLUEPRINTS[0];
+
+  return {
+    id: `hero-sample-${index}-${Math.random().toString(36).slice(2, 10)}`,
+    blueprintKey: blueprint.key,
+    state: createHeroSampleState(blueprint),
+    particles: blueprint.particles || {},
+  };
+}
+
+function createInitialHeroSamples() {
+  const shuffledBlueprints = [...HERO_SAMPLE_BLUEPRINTS].sort(() => Math.random() - 0.5);
+  return HERO_SAMPLE_LAYOUT.map((_, index) => {
+    const blueprint = shuffledBlueprints[index % shuffledBlueprints.length];
+    return {
+      id: `hero-sample-${index}-${Math.random().toString(36).slice(2, 10)}`,
+      blueprintKey: blueprint.key,
+      state: createHeroSampleState(blueprint),
+      particles: blueprint.particles || {},
+    };
+  });
 }
 
 const MODAL_FOCUSABLE_SELECTOR = [
@@ -2598,6 +3419,261 @@ function ImageFace({ iconState, metrics }) {
   );
 }
 
+function getSectionPreviewText(content) {
+  const preview = [...String(content || "").trim()].slice(0, 2).join("");
+  return preview || "A";
+}
+
+function getSectionPreviewShapeMetrics(state) {
+  if (state.shape === "none") {
+    return { width: 20, height: 20, borderRadius: 10 };
+  }
+
+  if (state.shape === "image") {
+    return {
+      width: 22,
+      height: 22,
+      borderRadius: clamp(Math.round(state.radius / 6), 6, 11),
+    };
+  }
+
+  const width = clamp(Math.round((state.widthScale / 100) * 18), 14, 30);
+  const height = clamp(Math.round((state.heightScale / 100) * 18), 14, 24);
+
+  return {
+    width,
+    height,
+    borderRadius: clamp(state.radius, 0, Math.min(width, height) / 2),
+  };
+}
+
+function ShapeSectionHeaderPreview({ state, className = "" }) {
+  const imageState = useMemo(
+    () => getImageStateForTarget(state, "shape"),
+    [
+      state.baseImageData,
+      state.baseImageName,
+      state.baseImageWidth,
+      state.baseImageHeight,
+      state.baseImageCropEnabled,
+      state.baseImageCropX,
+      state.baseImageCropY,
+      state.baseImageCropSize,
+      state.baseImageRotation,
+      state.baseImageHue,
+      state.baseImageContrast,
+      state.baseImageBrightness,
+      state.baseImageSilhouette,
+      state.baseImageSilhouetteColor,
+      state.baseImageEdgeStroke,
+      state.baseImageEdgeStrokeColor,
+    ],
+  );
+  const processedImage = useProcessedImageProfile(imageState);
+  const shapeMetrics = getSectionPreviewShapeMetrics(state);
+  const surfaceStyle =
+    state.shape !== "none" ? getMainSurfaceStyle(state, Math.min(state.outline, 2)) : null;
+
+  return (
+    <span
+      className={`section-header-preview section-header-preview-shape ${className}`.trim()}
+      aria-hidden="true"
+    >
+      {state.shape === "none" ? (
+        <span className="section-header-preview-none">/</span>
+      ) : (
+        <span
+          className="section-header-preview-shape-surface"
+          style={{
+            width: `${shapeMetrics.width}px`,
+            height: `${shapeMetrics.height}px`,
+            borderRadius: `${shapeMetrics.borderRadius}px`,
+            opacity: state.baseOpacity / 100,
+            ...(surfaceStyle || {}),
+          }}
+        >
+          {state.shape === "image" && processedImage ? (
+            <img
+              src={processedImage}
+              alt=""
+              draggable={false}
+              className="section-header-preview-shape-image"
+            />
+          ) : null}
+        </span>
+      )}
+    </span>
+  );
+}
+
+function ContentSectionHeaderPreview({ state }) {
+  const imageState = useMemo(
+    () => getImageStateForTarget(state, "content"),
+    [
+      state.imageData,
+      state.imageName,
+      state.imageWidth,
+      state.imageHeight,
+      state.imageCropEnabled,
+      state.imageCropX,
+      state.imageCropY,
+      state.imageCropSize,
+      state.imageRotation,
+      state.imageHue,
+      state.imageContrast,
+      state.imageBrightness,
+      state.imageSilhouette,
+      state.imageSilhouetteColor,
+      state.imageEdgeStroke,
+      state.imageEdgeStrokeColor,
+    ],
+  );
+  const processedImage = useProcessedImageProfile(imageState);
+  const previewText = getSectionPreviewText(state.content);
+
+  return (
+    <span className="section-header-preview section-header-preview-content" aria-hidden="true">
+      {state.mode === "none" ? (
+        <span className="section-header-preview-none">/</span>
+      ) : state.mode === "image" && processedImage ? (
+        <img src={processedImage} alt="" draggable={false} className="section-header-preview-image" />
+      ) : state.mode === "icon" ? (
+        <span
+          className="section-header-preview-icon"
+          style={{
+            color: state.textColor,
+            opacity: state.contentOpacity / 100,
+          }}
+        >
+          <LucideGlyph
+            name={normalizeLucideName(state.lucide) || DEFAULT_STATE.lucide}
+            size={18}
+            strokeWidth={Math.min(4, state.lucideWeight)}
+          />
+        </span>
+      ) : (
+        <span
+          className="section-header-preview-text"
+          style={{
+            color: state.textColor,
+            opacity: state.contentOpacity / 100,
+            fontFamily: state.fontFamily,
+            fontWeight: state.fontWeight,
+          }}
+        >
+          {previewText}
+        </span>
+      )}
+    </span>
+  );
+}
+
+function ColorSectionHeaderPreview({ state }) {
+  const fillPaint = getGradientPaint(
+    state.fillStops,
+    state.fillGradientType,
+    state.fillGradientAngle,
+    state.fillGradientCenterX,
+    state.fillGradientCenterY,
+  );
+  const strokePaint = getGradientPaint(
+    state.strokeStops,
+    state.strokeGradientType,
+    state.strokeGradientAngle,
+    state.strokeGradientCenterX,
+    state.strokeGradientCenterY,
+  );
+
+  return (
+    <span className="section-header-preview section-header-preview-colors" aria-hidden="true">
+      <span className="section-header-preview-swatch" style={{ background: fillPaint }} />
+      <span className="section-header-preview-swatch" style={{ background: state.textColor }} />
+      <span className="section-header-preview-swatch" style={{ background: strokePaint }} />
+      <span className="section-header-preview-swatch" style={{ background: state.backColor }} />
+    </span>
+  );
+}
+
+function BackLayerSectionHeaderPreview({ state }) {
+  const offset = getOffset(Math.max(8, state.backDistance), state.backAngle);
+  const backX = Number((offset.x * 0.32).toFixed(2));
+  const backY = Number((offset.y * 0.32).toFixed(2));
+
+  return (
+    <span className="section-header-preview section-header-preview-back-layer" aria-hidden="true">
+      <span
+        className="section-header-preview-back-shadow"
+        style={{
+          background: state.backColor,
+          opacity: state.backDistance > 0 ? 1 : 0.35,
+          transform: `translate(${backX}px, ${backY}px)`,
+        }}
+      />
+      <ShapeSectionHeaderPreview state={state} className="section-header-preview-back-front" />
+    </span>
+  );
+}
+
+function SectionPanel({
+  title,
+  isOpen,
+  onToggleOpen,
+  isEnabled,
+  onToggleEnabled,
+  headerPreview = null,
+  children,
+}) {
+  const showBody = isOpen;
+
+  return (
+    <section className={`section-panel ${isEnabled ? "" : "section-panel-disabled"}`.trim()}>
+      <h2 className="section-panel-head">
+        <button
+          type="button"
+          className="section-panel-toggle"
+          onClick={onToggleOpen}
+          aria-expanded={isOpen}
+        >
+          <span
+            className={isOpen ? "section-advanced-chevron open" : "section-advanced-chevron"}
+            aria-hidden="true"
+          >
+            ▸
+          </span>
+          <span className="section-panel-title">{title}</span>
+        </button>
+
+        {headerPreview}
+
+        <label className="section-panel-switch">
+          <input
+            type="checkbox"
+            checked={isEnabled}
+            onChange={(event) => onToggleEnabled(event.target.checked)}
+            aria-label={`${isEnabled ? "Disable" : "Enable"} ${title}`}
+          />
+          <span className="section-panel-switch-track" aria-hidden="true">
+            <span className="section-panel-switch-thumb" />
+          </span>
+        </label>
+      </h2>
+
+      {showBody ? (
+        <div className="section-panel-body-shell">
+          <fieldset className="section-panel-body" disabled={!isEnabled}>
+            {children}
+          </fieldset>
+          {!isEnabled ? (
+            <div className="section-panel-disabled-mask" aria-hidden="true">
+              <span>DISABLED</span>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 function ShapeImageFill({ iconState, metrics }) {
   const imageState = useMemo(
     () => getImageStateForTarget(iconState, "shape"),
@@ -2638,6 +3714,309 @@ function ShapeImageFill({ iconState, metrics }) {
       ) : (
         <span>{hasImage ? "Processing shape image..." : "Upload shape image"}</span>
       )}
+    </div>
+  );
+}
+
+function IconFace({ iconState, metrics }) {
+  if (!iconState.contentEnabled) {
+    return null;
+  }
+
+  if (iconState.mode === "text") {
+    return (
+      <span
+        className="text-content"
+        style={{
+          color: iconState.textColor,
+          opacity: iconState.contentOpacity / 100,
+          fontSize: `${metrics.fittedFontSize}px`,
+          fontFamily: iconState.fontFamily,
+          fontWeight: iconState.fontWeight,
+          letterSpacing: `${iconState.spacing}px`,
+          padding: `${iconState.inset + metrics.visibleOutline}px`,
+        }}
+      >
+        {iconState.content || " "}
+      </span>
+    );
+  }
+
+  if (iconState.mode === "image") {
+    return <ImageFace iconState={iconState} metrics={metrics} />;
+  }
+
+  if (iconState.mode === "none") {
+    return null;
+  }
+
+  return (
+    <div
+      className="lucide-content"
+      style={{
+        color: iconState.textColor,
+        opacity: iconState.contentOpacity / 100,
+        width: `${metrics.iconRenderSize}px`,
+        height: `${metrics.iconRenderSize}px`,
+      }}
+    >
+      <LucideGlyph
+        name={metrics.iconName}
+        size={metrics.iconRenderSize}
+        strokeWidth={iconState.lucideWeight}
+      />
+    </div>
+  );
+}
+
+function IconLayers({ iconState, metrics, className = "" }) {
+  return (
+    <>
+      {iconState.shapeEnabled && iconState.backLayerEnabled && iconState.shape !== "none" ? (
+        <div
+          className="icon-layer"
+          style={{
+            width: `${metrics.dimensions.width}px`,
+            height: `${metrics.dimensions.height}px`,
+            borderRadius: `${metrics.borderRadius}px`,
+            background: iconState.backColor,
+            border: "none",
+            transform: `translate(${metrics.offset.x}px, ${metrics.offset.y}px)`,
+            opacity: iconState.backDistance > 0 ? 1 : 0,
+          }}
+        />
+      ) : null}
+      <div
+        className={`icon-layer icon-main ${iconState.shapeEnabled && iconState.shape === "image" ? "shape-image" : ""} ${className}`.trim()}
+        style={{
+          width: `${metrics.dimensions.width}px`,
+          height: `${metrics.dimensions.height}px`,
+          borderRadius: `${metrics.borderRadius}px`,
+        }}
+      >
+        {iconState.shapeEnabled && iconState.shape !== "none" ? (
+          <div
+            className="icon-base-surface"
+            style={{
+              borderRadius: `${metrics.borderRadius}px`,
+              opacity: iconState.baseOpacity / 100,
+              ...metrics.mainSurfaceStyle,
+            }}
+          >
+            {iconState.shape === "image" ? (
+              <ShapeImageFill iconState={iconState} metrics={metrics} />
+            ) : null}
+          </div>
+        ) : null}
+        <IconFace iconState={iconState} metrics={metrics} />
+      </div>
+    </>
+  );
+}
+
+function CompositeIconStack({
+  baseState,
+  particles = {},
+  editorTarget = { type: "base" },
+  className = "",
+  interactive = false,
+  showCornerHotspots = false,
+  onSelectBase,
+  onSelectParticle,
+  onCornerAdd,
+}) {
+  const baseMetrics = useMemo(() => getIconMetrics(baseState), [baseState]);
+  const particleLayers = useMemo(
+    () => buildParticleLayers(baseMetrics, particles),
+    [baseMetrics, particles],
+  );
+  const cornerPoints = useMemo(() => buildCornerPoints(baseMetrics), [baseMetrics]);
+
+  return (
+    <div
+      className={`icon-stack composite-icon-stack ${className} ${
+        interactive ? "interactive-stack" : ""
+      }`.trim()}
+      style={{
+        width: `${baseMetrics.dimensions.width}px`,
+        height: `${baseMetrics.dimensions.height}px`,
+      }}
+      onClick={interactive ? onSelectBase : undefined}
+    >
+      <IconLayers iconState={baseState} metrics={baseMetrics} />
+
+      {particleLayers.map((layer) => (
+        <div
+          key={layer.key}
+          className={`particle-layer ${interactive ? "interactive" : ""} ${
+            editorTarget.type === "particle" && editorTarget.corner === layer.key
+              ? "editing-target"
+              : ""
+          }`}
+          style={{
+            left: `${layer.placement.left}px`,
+            top: `${layer.placement.top}px`,
+            width: `${layer.metrics.dimensions.width}px`,
+            height: `${layer.metrics.dimensions.height}px`,
+          }}
+          onClick={
+            interactive && onSelectParticle
+              ? (event) => {
+                  event.stopPropagation();
+                  onSelectParticle(layer.key);
+                }
+              : undefined
+          }
+          role={interactive ? "button" : undefined}
+          tabIndex={interactive ? 0 : undefined}
+          onKeyDown={
+            interactive && onSelectParticle
+              ? (event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    onSelectParticle(layer.key);
+                  }
+                }
+              : undefined
+          }
+          aria-label={interactive ? `Edit ${layer.label} particle` : undefined}
+        >
+          <div
+            className="icon-stack particle-stack"
+            style={{
+              width: `${layer.metrics.dimensions.width}px`,
+              height: `${layer.metrics.dimensions.height}px`,
+            }}
+          >
+            <IconLayers iconState={layer.particle.icon} metrics={layer.metrics} />
+          </div>
+          {interactive &&
+          editorTarget.type === "particle" &&
+          editorTarget.corner === layer.key ? (
+            <div
+              className="particle-focus-ring"
+              style={{
+                width: `${layer.metrics.dimensions.width + 20}px`,
+                height: `${layer.metrics.dimensions.height + 20}px`,
+                left: "-10px",
+                top: "-10px",
+              }}
+            >
+              <svg
+                viewBox={`0 0 ${layer.metrics.dimensions.width + 20} ${
+                  layer.metrics.dimensions.height + 20
+                }`}
+                preserveAspectRatio="none"
+                aria-hidden="true"
+              >
+                <rect
+                  className="particle-focus-ring-path"
+                  x="1"
+                  y="1"
+                  width={Math.max(1, layer.metrics.dimensions.width + 18)}
+                  height={Math.max(1, layer.metrics.dimensions.height + 18)}
+                  rx={Math.min(
+                    layer.metrics.borderRadius + 10,
+                    (layer.metrics.dimensions.width + 18) / 2,
+                    (layer.metrics.dimensions.height + 18) / 2,
+                  )}
+                  ry={Math.min(
+                    layer.metrics.borderRadius + 10,
+                    (layer.metrics.dimensions.width + 18) / 2,
+                    (layer.metrics.dimensions.height + 18) / 2,
+                  )}
+                />
+              </svg>
+            </div>
+          ) : null}
+        </div>
+      ))}
+
+      {showCornerHotspots
+        ? cornerPoints
+            .filter((corner) => !particles[corner.key])
+            .map((corner) => (
+              <button
+                key={corner.key}
+                type="button"
+                className="corner-hotspot"
+                style={{
+                  left: `${corner.point.x}px`,
+                  top: `${corner.point.y}px`,
+                  "--float-x": `${corner.float.baseX}px`,
+                  "--float-y": `${corner.float.baseY}px`,
+                  "--float-hover-x": `${corner.float.hoverX}px`,
+                  "--float-hover-y": `${corner.float.hoverY}px`,
+                }}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onCornerAdd?.(corner.key);
+                }}
+                title={`Add ${corner.label} particle`}
+                aria-label={`Add ${corner.label} particle`}
+              >
+                +
+              </button>
+            ))
+        : null}
+    </div>
+  );
+}
+
+function StaticCompositionPreview({
+  baseState,
+  particles = {},
+  editorTarget = { type: "base" },
+  targetSize,
+  padding = 0,
+  className = "",
+}) {
+  const baseMetrics = useMemo(() => getIconMetrics(baseState), [baseState]);
+  const particleLayers = useMemo(
+    () => buildParticleLayers(baseMetrics, particles),
+    [baseMetrics, particles],
+  );
+  const bounds = useMemo(
+    () => getCompositeBounds(baseMetrics, particleLayers),
+    [baseMetrics, particleLayers],
+  );
+  const innerTargetSize = Math.max(16, targetSize - padding * 2);
+  const scale = useMemo(() => getContextScale(innerTargetSize, bounds), [innerTargetSize, bounds]);
+  const offsetX = -bounds.minX;
+  const offsetY = -bounds.minY;
+
+  return (
+    <div
+      className={`static-composition-preview ${className}`.trim()}
+      style={{ width: `${targetSize}px`, height: `${targetSize}px` }}
+    >
+      <div
+        className="static-composition-preview-scale"
+        style={{ transform: `translate(-50%, -50%) scale(${scale.toFixed(4)})` }}
+      >
+        <span
+          className="static-composition-preview-frame"
+          style={{
+            width: `${bounds.width}px`,
+            height: `${bounds.height}px`,
+          }}
+        >
+          <span
+            className="static-composition-preview-offset"
+            style={{
+              left: `${offsetX.toFixed(2)}px`,
+              top: `${offsetY.toFixed(2)}px`,
+            }}
+          >
+            <CompositeIconStack
+              baseState={baseState}
+              particles={particles}
+              editorTarget={editorTarget}
+            />
+          </span>
+        </span>
+      </div>
     </div>
   );
 }
@@ -3032,6 +4411,11 @@ function ImageEditorControls({
   targetLabel,
   inputRef,
   imageState,
+  exportSizeLabel,
+  exportSizeSummary,
+  isExportSizeEnabled = false,
+  isUsingExportImageSize = false,
+  onExportSizeToggle,
   onFileChange,
   onUpload,
   onRecrop,
@@ -3075,6 +4459,21 @@ function ImageEditorControls({
         <p className="helper">
           {targetLabel} upload prompts square-crop or keep original, then auto-resizes.
         </p>
+        <label
+          className={`export-size-switch ${isExportSizeEnabled ? "" : "disabled"}`.trim()}
+        >
+          <input
+            type="checkbox"
+            checked={isUsingExportImageSize}
+            onChange={(event) => onExportSizeToggle?.(event.target.checked)}
+            disabled={!isExportSizeEnabled}
+          />
+          <span className="export-size-switch-track" aria-hidden="true">
+            <span className="export-size-switch-thumb" />
+          </span>
+          <span className="export-size-switch-copy">{exportSizeLabel}</span>
+        </label>
+        <p className="helper">{exportSizeSummary}</p>
       </div>
 
       {imageState.imageData ? (
@@ -3200,6 +4599,13 @@ function ImageEditorControls({
 }
 
 function App() {
+  const fallbackUrlSafeShareCode = encodeState(DEFAULT_STATE, {}, DEFAULT_CANVAS_SIZE, {
+    urlSafe: true,
+  });
+  const [pageMode] = useState(() => {
+    if (typeof window === "undefined") return "editor";
+    return resolvePageModeFromUrl(new URL(window.location.href));
+  });
   const [baseState, setBaseState] = useState(DEFAULT_STATE);
   const [particles, setParticles] = useState({});
   const [canvasSize, setCanvasSize] = useState(DEFAULT_CANVAS_SIZE);
@@ -3210,16 +4616,29 @@ function App() {
   const [isInfoOpen, setInfoOpen] = useState(false);
   const [isIconPickerOpen, setIconPickerOpen] = useState(false);
   const [isFontPickerOpen, setFontPickerOpen] = useState(false);
+  const [isContentSectionOpen, setContentSectionOpen] = useState(true);
+  const [isShapeSectionOpen, setShapeSectionOpen] = useState(true);
+  const [isColorSectionOpen, setColorSectionOpen] = useState(true);
+  const [isBackLayerSectionOpen, setBackLayerSectionOpen] = useState(true);
+  const [isColorSectionEnabled, setColorSectionEnabled] = useState(true);
   const [isContentAdvancedOpen, setContentAdvancedOpen] = useState(false);
   const [isShapeAdvancedOpen, setShapeAdvancedOpen] = useState(false);
   const [isBackDistanceLocked, setBackDistanceLocked] = useState(false);
   const [isBackAngleLocked, setBackAngleLocked] = useState(false);
   const [exportScale, setExportScale] = useState(DEFAULT_EXPORT_SCALE);
+  const [useImportedImageExportSize, setUseImportedImageExportSize] = useState(false);
   const [cursorTooltip, setCursorTooltip] = useState(null);
   const [previewContextMode, setPreviewContextMode] = useState(DEFAULT_PREVIEW_CONTEXT_MODE);
   const [imageCropState, setImageCropState] = useState(() => createDefaultImageCropState());
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
+  const [sharePageStatus, setSharePageStatus] = useState(() =>
+    pageMode === "copiedLink" ? "loading" : "builder",
+  );
+  const [uiPhase, setUiPhase] = useState(() =>
+    pageMode === "copiedLink" ? "builder" : "landing",
+  );
+  const [heroSamples, setHeroSamples] = useState(() => createInitialHeroSamples());
 
   const exportRef = useRef(null);
   const controlsRef = useRef(null);
@@ -3227,6 +4646,16 @@ function App() {
   const shapeImageUploadInputRef = useRef(null);
   const hasHydratedFromUrlRef = useRef(false);
   const skipNextShareUrlSyncRef = useRef(false);
+  const heroTransitionTimerRef = useRef(null);
+  const heroSampleIntervalRef = useRef(null);
+  const lastEnabledContentModeRef = useRef({ base: DEFAULT_STATE.mode });
+  const lastEnabledShapeRef = useRef({ base: DEFAULT_STATE.shape });
+  const lastEnabledBackLayerRef = useRef({
+    base: {
+      backDistance: 10,
+      backAngle: DEFAULT_STATE.backAngle,
+    },
+  });
   const historyRef = useRef({
     past: [],
     future: [],
@@ -3264,6 +4693,23 @@ function App() {
     editorTarget.type === "particle" ? particles[editorTarget.corner] : null;
   const isEditingParticle = Boolean(activeParticle);
   const state = isEditingParticle ? activeParticle.icon : baseState;
+  const editorStateKey = isEditingParticle ? `particle:${editorTarget.corner}` : "base";
+  const selectedShapeMode = state.shape;
+  const isContentSectionEnabled = state.contentEnabled;
+  const isShapeSectionEnabled = state.shapeEnabled;
+  const isBackLayerSectionEnabled = state.backLayerEnabled;
+  const activeShapePreset =
+    state.shape !== "shape"
+      ? ""
+      : state.widthScale === 100 && state.heightScale === 100 && state.radius >= SHAPE_RADIUS_MAX
+        ? "circle"
+        : state.widthScale === 170 && state.heightScale === 72 && state.radius >= SHAPE_RADIUS_MAX
+          ? "pill"
+          : state.widthScale === 160 && state.heightScale === 100 && state.radius === DEFAULT_STATE.radius
+            ? "rectangle"
+            : state.widthScale === 100 && state.heightScale === 100
+              ? "square"
+              : "";
   const activeMetrics = useMemo(() => getIconMetrics(state), [state]);
   const baseMetrics = useMemo(() => getIconMetrics(baseState), [baseState]);
   const isTextScaleCappedByLink = useMemo(() => {
@@ -3283,55 +4729,26 @@ function App() {
     () => encodeState(baseState, particles, canvasSize, { urlSafe: true }),
     [baseState, particles, canvasSize],
   );
-  const hasEmbeddedImagePayload = useMemo(
-    () =>
-      iconStateHasEmbeddedImages(baseState) ||
-      Object.values(particles).some((particle) =>
-        iconStateHasEmbeddedImages(particle.icon),
-      ),
+  const editorShareUrl = useMemo(
+    () => createShareUrl(urlSafeShareCode, { destination: "editor" }),
+    [urlSafeShareCode],
+  );
+  const copiedLinkShareUrl = useMemo(
+    () => createShareUrl(urlSafeShareCode, { destination: "copiedLink" }),
+    [urlSafeShareCode],
+  );
+  const builderHomeUrl = useMemo(
+    () => createShareUrl("", { destination: "editor" }),
+    [],
+  );
+  const hasImageBackedShare = useMemo(
+    () => compositionUsesImageBacking(baseState, particles),
     [baseState, particles],
   );
-  const cornerPoints = useMemo(
-    () =>
-      PARTICLE_CORNERS.map((corner) => ({
-        ...corner,
-        point: getCornerPoint(
-          corner.key,
-          baseMetrics.dimensions.width,
-          baseMetrics.dimensions.height,
-        ),
-        float: getHotspotFloat(
-          corner.key,
-          baseMetrics.dimensions.width,
-          baseMetrics.dimensions.height,
-        ),
-      })),
-    [baseMetrics.dimensions.width, baseMetrics.dimensions.height],
+  const particleLayers = useMemo(
+    () => buildParticleLayers(baseMetrics, particles),
+    [baseMetrics, particles],
   );
-
-  const particleLayers = useMemo(() => {
-    const layers = [];
-    for (const corner of PARTICLE_CORNERS) {
-      const particle = particles[corner.key];
-      if (!particle) continue;
-      const metrics = getIconMetrics(particle.icon);
-      const placement = getParticlePlacement(
-        corner.key,
-        baseMetrics.dimensions,
-        metrics.dimensions,
-        particle.offsetX,
-        particle.offsetY,
-      );
-
-      layers.push({
-        ...corner,
-        particle,
-        metrics,
-        placement,
-      });
-    }
-    return layers;
-  }, [particles, baseMetrics.dimensions]);
 
   const selectedParticleLayer = isEditingParticle
     ? particleLayers.find((layer) => layer.key === editorTarget.corner) || null
@@ -3351,13 +4768,76 @@ function App() {
     () => getCompositeBounds(baseMetrics, particleLayers),
     [baseMetrics, particleLayers],
   );
+  const preferredImageExportDimensions = useMemo(() => {
+    const candidates = [];
+
+    if (baseState.shapeEnabled && baseState.shape === "image" && baseState.baseImageData) {
+      const dimensions = getExportDimensionsFromImageState(
+        getImageStateForTarget(baseState, "shape"),
+      );
+      if (dimensions) {
+        candidates.push({ ...dimensions, source: "base image" });
+      }
+    }
+
+    if (baseState.contentEnabled && baseState.mode === "image" && baseState.imageData) {
+      const dimensions = getExportDimensionsFromImageState(
+        getImageStateForTarget(baseState, "content"),
+      );
+      if (dimensions) {
+        candidates.push({ ...dimensions, source: "content image" });
+      }
+    }
+
+    if (candidates.length === 0) return null;
+    return candidates.reduce((best, candidate) =>
+      candidate.width * candidate.height > best.width * best.height ? candidate : best,
+    );
+  }, [
+    baseState.shapeEnabled,
+    baseState.shape,
+    baseState.baseImageData,
+    baseState.baseImageWidth,
+    baseState.baseImageHeight,
+    baseState.baseImageCropEnabled,
+    baseState.baseImageCropSize,
+    baseState.contentEnabled,
+    baseState.mode,
+    baseState.imageData,
+    baseState.imageWidth,
+    baseState.imageHeight,
+    baseState.imageCropEnabled,
+    baseState.imageCropSize,
+  ]);
+  const shouldUseImportedImageExportSize =
+    useImportedImageExportSize && Boolean(preferredImageExportDimensions);
+  const exportTargetWidth = shouldUseImportedImageExportSize
+    ? preferredImageExportDimensions.width
+    : EXPORT_CANVAS_SIZE;
+  const exportTargetHeight = shouldUseImportedImageExportSize
+    ? preferredImageExportDimensions.height
+    : EXPORT_CANVAS_SIZE;
   const previewLayout = useMemo(
-    () => getCompositionLayout(compositeBounds, canvasSize, PREVIEW_SAFE_MARGIN, false),
+    () =>
+      getCompositionLayout(
+        compositeBounds,
+        canvasSize,
+        canvasSize,
+        PREVIEW_SAFE_MARGIN,
+        false,
+      ),
     [compositeBounds, canvasSize],
   );
   const exportLayout = useMemo(
-    () => getCompositionLayout(compositeBounds, EXPORT_CANVAS_SIZE, EXPORT_SAFE_MARGIN, true),
-    [compositeBounds],
+    () =>
+      getCompositionLayout(
+        compositeBounds,
+        exportTargetWidth,
+        exportTargetHeight,
+        EXPORT_SAFE_MARGIN,
+        true,
+      ),
+    [compositeBounds, exportTargetWidth, exportTargetHeight],
   );
   const previewZoomScale = isEditingParticle ? PARTICLE_EDIT_ZOOM : 1;
   const previewCompositionTransform = `translate(${(
@@ -3368,7 +4848,14 @@ function App() {
   const exportCompositionTransform = `translate(${exportLayout.offsetX.toFixed(
     2,
   )}px, ${exportLayout.offsetY.toFixed(2)}px) scale(${exportLayout.scale.toFixed(4)})`;
-  const exportPixelSize = EXPORT_CANVAS_SIZE * exportScale;
+  const exportPixelWidth = exportTargetWidth * exportScale;
+  const exportPixelHeight = exportTargetHeight * exportScale;
+  const exportSizeSummary = shouldUseImportedImageExportSize && preferredImageExportDimensions
+    ? `${preferredImageExportDimensions.source}: ${exportTargetWidth} x ${exportTargetHeight}, export ${exportPixelWidth} x ${exportPixelHeight} at ${exportScale}x`
+    : preferredImageExportDimensions
+      ? `Square canvas: ${exportPixelWidth} x ${exportPixelHeight} at ${exportScale}x`
+      : `${exportPixelWidth} x ${exportPixelHeight}`;
+  const isHeroVisible = pageMode !== "copiedLink" && uiPhase !== "builder";
 
   useEffect(() => {
     if (!toast) return undefined;
@@ -3377,11 +4864,39 @@ function App() {
   }, [toast]);
 
   useEffect(() => {
+    if (pageMode === "copiedLink" || uiPhase !== "landing") return undefined;
+
+    const swapHeroSample = () => {
+      setHeroSamples((current) => {
+        if (current.length === 0) return current;
+        const index = Math.floor(Math.random() * current.length);
+        const next = [...current];
+        next[index] = createHeroSampleItem(index, current[index]?.blueprintKey);
+        return next;
+      });
+    };
+
+    const delayTimer = window.setTimeout(() => {
+      swapHeroSample();
+      const intervalId = window.setInterval(swapHeroSample, HERO_SAMPLE_SWAP_MS);
+      heroSampleIntervalRef.current = intervalId;
+    }, HERO_SAMPLE_SWAP_DELAY_MS);
+
+    return () => {
+      window.clearTimeout(delayTimer);
+      if (heroSampleIntervalRef.current) {
+        window.clearInterval(heroSampleIntervalRef.current);
+        heroSampleIntervalRef.current = null;
+      }
+    };
+  }, [pageMode, uiPhase]);
+
+  useEffect(() => {
     if (hasHydratedFromUrlRef.current) return;
 
     const hydration = resolveUrlHydration(
       new URL(window.location.href),
-      encodeState(DEFAULT_STATE, {}, DEFAULT_CANVAS_SIZE, { urlSafe: true }),
+      fallbackUrlSafeShareCode,
     );
 
     if (hydration.status === "valid") {
@@ -3391,14 +4906,24 @@ function App() {
       setParticles(hydration.decoded.particles);
       setCanvasSize(hydration.decoded.canvasSize);
       setEditorTarget({ type: "base" });
-      setToast("Loaded code from URL");
+      if (pageMode === "copiedLink") {
+        setSharePageStatus(hydration.missingSharedImages ? "unsupported-images" : "valid");
+      } else {
+        setToast("Loaded code from URL");
+      }
     } else if (hydration.status === "invalid") {
       setLoadCode(hydration.invalidCode);
-      setToast("URL code is invalid");
+      if (pageMode === "copiedLink") {
+        setSharePageStatus("invalid");
+      } else {
+        setToast("URL code is invalid");
+      }
+    } else if (pageMode === "copiedLink") {
+      setSharePageStatus("missing");
     }
 
     hasHydratedFromUrlRef.current = true;
-  }, []);
+  }, [fallbackUrlSafeShareCode, pageMode, urlSafeShareCode]);
 
   useEffect(() => {
     if (!hasHydratedFromUrlRef.current) return;
@@ -3406,17 +4931,45 @@ function App() {
       skipNextShareUrlSyncRef.current = false;
       return;
     }
-    const nextUrl = createShareUrl(urlSafeShareCode);
+    if (
+      pageMode === "copiedLink" &&
+      sharePageStatus !== "valid" &&
+      sharePageStatus !== "unsupported-images"
+    ) {
+      return;
+    }
+    const nextUrl = createShareUrl(urlSafeShareCode, { destination: pageMode });
     if (nextUrl !== window.location.href) {
       window.history.replaceState(null, "", nextUrl);
     }
-  }, [urlSafeShareCode]);
+  }, [pageMode, sharePageStatus, urlSafeShareCode]);
 
   useEffect(() => {
     if (editorTarget.type !== "particle") return;
     if (particles[editorTarget.corner]) return;
     setEditorTarget({ type: "base" });
   }, [editorTarget, particles]);
+
+  useEffect(() => {
+    if (state.mode !== "none") {
+      lastEnabledContentModeRef.current[editorStateKey] = state.mode;
+    }
+  }, [editorStateKey, state.mode]);
+
+  useEffect(() => {
+    if (state.shape !== "none") {
+      lastEnabledShapeRef.current[editorStateKey] = state.shape;
+    }
+  }, [editorStateKey, state.shape]);
+
+  useEffect(() => {
+    if (state.backDistance > 0) {
+      lastEnabledBackLayerRef.current[editorStateKey] = {
+        backDistance: state.backDistance,
+        backAngle: state.backAngle,
+      };
+    }
+  }, [editorStateKey, state.backAngle, state.backDistance]);
 
   useEffect(() => {
     const currentSnapshot = cloneHistorySnapshot(createHistorySnapshot());
@@ -3477,6 +5030,45 @@ function App() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (heroTransitionTimerRef.current) {
+        window.clearTimeout(heroTransitionTimerRef.current);
+      }
+      if (heroSampleIntervalRef.current) {
+        window.clearInterval(heroSampleIntervalRef.current);
+      }
+    };
+  }, []);
+
+  const handleStartBuilder = () => {
+    if (uiPhase !== "landing") return;
+
+    setUiPhase("transitioning");
+    if (heroTransitionTimerRef.current) {
+      window.clearTimeout(heroTransitionTimerRef.current);
+    }
+
+    heroTransitionTimerRef.current = window.setTimeout(() => {
+      setUiPhase("builder");
+      heroTransitionTimerRef.current = null;
+    }, LANDING_TO_BUILDER_MS);
+  };
+
+  const handleReturnToLanding = () => {
+    if (heroTransitionTimerRef.current) {
+      window.clearTimeout(heroTransitionTimerRef.current);
+      heroTransitionTimerRef.current = null;
+    }
+    setInfoOpen(false);
+    setShareOpen(false);
+    setIconPickerOpen(false);
+    setFontPickerOpen(false);
+    setImageCropState((current) => ({ ...current, open: false }));
+    setCursorTooltip(null);
+    setUiPhase("landing");
+  };
+
   const updateActiveState = (updater) => {
     if (isEditingParticle) {
       setParticles((current) => {
@@ -3499,6 +5091,48 @@ function App() {
 
   const patchState = (patch) => {
     updateActiveState((current) => ({ ...current, ...patch }));
+  };
+
+  const handleContentSectionEnabledChange = (enabled) => {
+    const fallbackMode = lastEnabledContentModeRef.current[editorStateKey] || DEFAULT_STATE.mode;
+    patchState({
+      contentEnabled: enabled,
+      mode: enabled && state.mode === "none" ? fallbackMode : state.mode,
+    });
+  };
+
+  const handleShapeSectionEnabledChange = (enabled) => {
+    const fallbackShape = lastEnabledShapeRef.current[editorStateKey] || DEFAULT_STATE.shape;
+    patchState({
+      shapeEnabled: enabled,
+      shape: enabled && state.shape === "none" ? fallbackShape : state.shape,
+    });
+  };
+
+  const handleBackLayerSectionEnabledChange = (enabled) => {
+    const fallbackBackLayer = lastEnabledBackLayerRef.current[editorStateKey] || {
+      backDistance: 10,
+      backAngle: state.backAngle,
+    };
+    patchState({
+      backLayerEnabled: enabled,
+      backDistance:
+        enabled && state.backDistance === 0 ? fallbackBackLayer.backDistance : state.backDistance,
+      backAngle: enabled ? fallbackBackLayer.backAngle : state.backAngle,
+    });
+  };
+
+  const applyShapePreset = (preset) => {
+    const presetPatch =
+      preset === "circle"
+        ? { shape: "shape", widthScale: 100, heightScale: 100, radius: SHAPE_RADIUS_MAX }
+        : preset === "pill"
+          ? { shape: "shape", widthScale: 170, heightScale: 72, radius: SHAPE_RADIUS_MAX }
+          : preset === "rectangle"
+            ? { shape: "shape", widthScale: 160, heightScale: 100, radius: DEFAULT_STATE.radius }
+            : { shape: "shape", widthScale: 100, heightScale: 100, radius: DEFAULT_STATE.radius };
+
+    patchState(presetPatch);
   };
 
   const handleUndo = () => {
@@ -3562,12 +5196,11 @@ function App() {
   };
 
   const handleCopyShareLink = () => {
-    copyToClipboard(
-      createShareUrl(urlSafeShareCode),
-      hasEmbeddedImagePayload
-        ? "Share link copied (URL-safe). Use Copy code for full image fidelity."
-        : "Share link copied",
-    );
+    if (hasImageBackedShare) {
+      setToast("Copied links do not support uploaded images yet. Use Copy code for full fidelity.");
+      return;
+    }
+    copyToClipboard(copiedLinkShareUrl, "Share link copied");
   };
 
   const handleExport = async () => {
@@ -3592,11 +5225,26 @@ function App() {
 
       const link = document.createElement("a");
       link.href = dataUrl;
-      link.download = `icon-${namePart || "icon"}-${EXPORT_CANVAS_SIZE}@${exportScale}x.png`;
+      link.download = `icon-${namePart || "icon"}-${exportTargetWidth}x${exportTargetHeight}@${exportScale}x.png`;
       link.click();
-      setToast(`PNG exported (${exportPixelSize} x ${exportPixelSize})`);
+      setToast(`PNG exported (${exportPixelWidth} x ${exportPixelHeight})`);
     } catch {
       setToast("Export failed");
+    }
+  };
+
+  const handleLoadIquanLogo = () => {
+    try {
+      const next = decodeState(IQUAN_LOGO_CODE);
+      setBaseState(next.base);
+      setParticles(next.particles);
+      setCanvasSize(next.canvasSize);
+      setEditorTarget({ type: "base" });
+      setLoadCode(IQUAN_LOGO_CODE);
+      setShareOpen(false);
+      setToast("Loaded iquan logo");
+    } catch {
+      setToast("Could not load iquan logo");
     }
   };
 
@@ -3613,21 +5261,6 @@ function App() {
       setToast("Code loaded");
     } catch (error) {
       setToast(error.message || "Invalid code");
-    }
-  };
-
-  const handleLoadIquanLogo = () => {
-    try {
-      const next = decodeState(IQUAN_LOGO_CODE);
-      setBaseState(next.base);
-      setParticles(next.particles);
-      setCanvasSize(next.canvasSize);
-      setEditorTarget({ type: "base" });
-      setLoadCode(IQUAN_LOGO_CODE);
-      setShareOpen(false);
-      setToast("Loaded iquan logo preset");
-    } catch {
-      setToast("Iquan logo preset is invalid");
     }
   };
 
@@ -3925,6 +5558,7 @@ function App() {
     setShapeAdvancedOpen(false);
     setBackDistanceLocked(false);
     setBackAngleLocked(false);
+    setColorSectionEnabled(true);
     setExportScale(DEFAULT_EXPORT_SCALE);
     setPreviewContextMode(DEFAULT_PREVIEW_CONTEXT_MODE);
     setCursorTooltip(null);
@@ -3943,9 +5577,6 @@ function App() {
   const handleSelectBase = () => {
     setEditorTarget({ type: "base" });
   };
-
-  const getCornerLabel = (cornerKey) =>
-    PARTICLE_CORNERS.find((corner) => corner.key === cornerKey)?.label || cornerKey;
 
   const handleCornerAddOrSelect = (cornerKey) => {
     const hadParticle = Boolean(particles[cornerKey]);
@@ -3981,227 +5612,6 @@ function App() {
     setToast(`Removed ${label} particle`);
   };
 
-  const renderIconFace = (iconState, metrics) => {
-    if (iconState.mode === "text") {
-      return (
-        <span
-          className="text-content"
-          style={{
-            color: iconState.textColor,
-            opacity: iconState.contentOpacity / 100,
-            fontSize: `${metrics.fittedFontSize}px`,
-            fontFamily: iconState.fontFamily,
-            fontWeight: iconState.fontWeight,
-            letterSpacing: `${iconState.spacing}px`,
-            padding: `${iconState.inset + metrics.visibleOutline}px`,
-          }}
-        >
-          {iconState.content || " "}
-        </span>
-      );
-    }
-
-    if (iconState.mode === "image") {
-      return <ImageFace iconState={iconState} metrics={metrics} />;
-    }
-
-    if (iconState.mode === "none") {
-      return null;
-    }
-
-    return (
-      <div
-        className="lucide-content"
-        style={{
-          color: iconState.textColor,
-          opacity: iconState.contentOpacity / 100,
-          width: `${metrics.iconRenderSize}px`,
-          height: `${metrics.iconRenderSize}px`,
-        }}
-      >
-        <LucideGlyph
-          name={metrics.iconName}
-          size={metrics.iconRenderSize}
-          strokeWidth={iconState.lucideWeight}
-        />
-      </div>
-    );
-  };
-
-  const renderIconLayers = (iconState, metrics, className = "") => (
-    <>
-      <div
-        className="icon-layer"
-        style={{
-          width: `${metrics.dimensions.width}px`,
-          height: `${metrics.dimensions.height}px`,
-          borderRadius: `${metrics.borderRadius}px`,
-          background: iconState.backColor,
-          border: "none",
-          transform: `translate(${metrics.offset.x}px, ${metrics.offset.y}px)`,
-          opacity: iconState.backDistance > 0 ? 1 : 0,
-        }}
-      />
-      <div
-        className={`icon-layer icon-main ${iconState.shape === "image" ? "shape-image" : ""} ${className}`.trim()}
-        style={{
-          width: `${metrics.dimensions.width}px`,
-          height: `${metrics.dimensions.height}px`,
-          borderRadius: `${metrics.borderRadius}px`,
-        }}
-      >
-        <div
-          className="icon-base-surface"
-          style={{
-            borderRadius: `${metrics.borderRadius}px`,
-            opacity: iconState.baseOpacity / 100,
-            ...metrics.mainSurfaceStyle,
-          }}
-        >
-          {iconState.shape === "image" ? (
-            <ShapeImageFill iconState={iconState} metrics={metrics} />
-          ) : null}
-        </div>
-        {renderIconFace(iconState, metrics)}
-      </div>
-    </>
-  );
-
-  const renderCompositeIconStack = ({
-    className = "",
-    interactive = false,
-    showCornerHotspots = false,
-  } = {}) => (
-    <div
-      className={`icon-stack composite-icon-stack ${className} ${
-        interactive ? "interactive-stack" : ""
-      }`.trim()}
-      style={{
-        width: `${baseMetrics.dimensions.width}px`,
-        height: `${baseMetrics.dimensions.height}px`,
-      }}
-      onClick={interactive ? handleSelectBase : undefined}
-    >
-      {renderIconLayers(baseState, baseMetrics)}
-
-      {particleLayers.map((layer) => (
-        <div
-          key={layer.key}
-          className={`particle-layer ${interactive ? "interactive" : ""} ${
-            editorTarget.type === "particle" && editorTarget.corner === layer.key
-              ? "editing-target"
-              : ""
-          }`}
-          style={{
-            left: `${layer.placement.left}px`,
-            top: `${layer.placement.top}px`,
-            width: `${layer.metrics.dimensions.width}px`,
-            height: `${layer.metrics.dimensions.height}px`,
-          }}
-          onClick={
-            interactive
-              ? (event) => {
-                  event.stopPropagation();
-                  handleSelectParticle(layer.key);
-                }
-              : undefined
-          }
-          role={interactive ? "button" : undefined}
-          tabIndex={interactive ? 0 : undefined}
-          onKeyDown={
-            interactive
-              ? (event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    handleSelectParticle(layer.key);
-                  }
-                }
-              : undefined
-          }
-          aria-label={interactive ? `Edit ${layer.label} particle` : undefined}
-        >
-          <div
-            className="icon-stack particle-stack"
-            style={{
-              width: `${layer.metrics.dimensions.width}px`,
-              height: `${layer.metrics.dimensions.height}px`,
-            }}
-          >
-            {renderIconLayers(layer.particle.icon, layer.metrics)}
-          </div>
-          {interactive &&
-          editorTarget.type === "particle" &&
-          editorTarget.corner === layer.key ? (
-            <div
-              className="particle-focus-ring"
-              style={{
-                width: `${layer.metrics.dimensions.width + 20}px`,
-                height: `${layer.metrics.dimensions.height + 20}px`,
-                left: "-10px",
-                top: "-10px",
-              }}
-            >
-              <svg
-                viewBox={`0 0 ${layer.metrics.dimensions.width + 20} ${
-                  layer.metrics.dimensions.height + 20
-                }`}
-                preserveAspectRatio="none"
-                aria-hidden="true"
-              >
-                <rect
-                  className="particle-focus-ring-path"
-                  x="1"
-                  y="1"
-                  width={Math.max(1, layer.metrics.dimensions.width + 18)}
-                  height={Math.max(1, layer.metrics.dimensions.height + 18)}
-                  rx={Math.min(
-                    layer.metrics.borderRadius + 10,
-                    (layer.metrics.dimensions.width + 18) / 2,
-                    (layer.metrics.dimensions.height + 18) / 2,
-                  )}
-                  ry={Math.min(
-                    layer.metrics.borderRadius + 10,
-                    (layer.metrics.dimensions.width + 18) / 2,
-                    (layer.metrics.dimensions.height + 18) / 2,
-                  )}
-                />
-              </svg>
-            </div>
-          ) : null}
-        </div>
-      ))}
-
-      {showCornerHotspots
-        ? cornerPoints
-            .filter((corner) => !particles[corner.key])
-            .map((corner) => (
-            <button
-              key={corner.key}
-              type="button"
-              className="corner-hotspot"
-              style={{
-                left: `${corner.point.x}px`,
-                top: `${corner.point.y}px`,
-                "--float-x": `${corner.float.baseX}px`,
-                "--float-y": `${corner.float.baseY}px`,
-                "--float-hover-x": `${corner.float.hoverX}px`,
-                "--float-hover-y": `${corner.float.hoverY}px`,
-              }}
-              onClick={(event) => {
-                event.stopPropagation();
-                handleCornerAddOrSelect(corner.key);
-              }}
-              title={`Add ${corner.label} particle`}
-              aria-label={`Add ${corner.label} particle`}
-            >
-              +
-            </button>
-            ))
-        : null}
-    </div>
-  );
-
   const renderContextCompositeStack = () => (
     <span
       className="context-icon-frame"
@@ -4217,13 +5627,221 @@ function App() {
           top: `${contextOffsetY.toFixed(2)}px`,
         }}
       >
-        {renderCompositeIconStack({ className: "context-icon-stack" })}
+        <CompositeIconStack
+          baseState={baseState}
+          particles={particles}
+          editorTarget={editorTarget}
+          className="context-icon-stack"
+        />
       </span>
     </span>
   );
 
+  const exportCaptureBuffer = (
+    <div className="export-capture-buffer" aria-hidden="true">
+      <div
+        ref={exportRef}
+        className="export-target"
+        style={{
+          width: `${exportTargetWidth}px`,
+          height: `${exportTargetHeight}px`,
+        }}
+      >
+        <div
+          className="export-target-inner"
+          style={{ transform: exportCompositionTransform }}
+        >
+          <CompositeIconStack
+            baseState={baseState}
+            particles={particles}
+            editorTarget={editorTarget}
+          />
+        </div>
+      </div>
+    </div>
+  );
+
+  const aboutModal = (
+    <Modal
+      open={isInfoOpen}
+      title="About Iquan Icon Builder"
+      onClose={() => setInfoOpen(false)}
+      actions={
+        <button type="button" className="btn-secondary" onClick={() => setInfoOpen(false)}>
+          Seems Cool
+        </button>
+      }
+    >
+      <div className="about-modal-content">
+        <p className="about-modal-copy">
+          Iquan was developed for the Codex Creator Challenge by Owen Whelan. It's a free
+          software online that you can use to make little icons and emojis without having to
+          break out a whole image editor. It's great for text editors, messaging platforms, and
+          stickers in notebook apps.
+        </p>
+        <div className="about-modal-links">
+          <a
+            className="about-modal-link about-modal-link-primary"
+            href="https://www.owenwhelan.com"
+            target="_blank"
+            rel="noreferrer"
+          >
+            About Me
+          </a>
+          <a
+            className="about-modal-link about-modal-link-secondary"
+            href="https://github.com/RockhopperHD/iquan"
+            target="_blank"
+            rel="noreferrer"
+          >
+            GitHub Repo
+          </a>
+        </div>
+      </div>
+    </Modal>
+  );
+
+  if (pageMode === "copiedLink") {
+    const isValidSharedPage = sharePageStatus === "valid";
+    const isUnsupportedSharedPage = sharePageStatus === "unsupported-images";
+    const isInvalidSharedPage = sharePageStatus === "invalid";
+    const isMissingSharedPage = sharePageStatus === "missing";
+
+    return (
+      <div className="shared-page-shell">
+        <header className="app-header shared-page-header" aria-live="polite">
+          <div className="app-header-side" />
+          <a className="app-header-title app-header-title-link" href={builderHomeUrl}>
+            Iquan Icon Builder
+          </a>
+          <div className="app-header-side app-header-side-end">
+            <button
+              type="button"
+              className="app-header-info"
+              onClick={() => setInfoOpen(true)}
+              aria-label="Open app information"
+              title="App information"
+            >
+              i
+            </button>
+          </div>
+        </header>
+
+        <main className="shared-page">
+          <section className="shared-page-card">
+            {sharePageStatus === "loading" ? (
+              <div className="shared-page-state">
+                <p className="shared-page-eyebrow">Shared from Iquan</p>
+                <h1>Loading shared icon</h1>
+                <p className="helper">
+                  Reading the share link and preparing the export preview.
+                </p>
+              </div>
+            ) : null}
+
+            {isValidSharedPage ? (
+              <>
+                <div className="shared-page-copy">
+                  <p className="shared-page-eyebrow">Shared from Iquan</p>
+                  <h1>Here is the icon that was shared</h1>
+                  <p className="helper">
+                    Export a PNG from this page, or open the icon in the editor for more control.
+                  </p>
+                </div>
+
+                <div className="shared-page-preview-panel">
+                  <StaticCompositionPreview
+                    baseState={baseState}
+                    particles={particles}
+                    editorTarget={{ type: "base" }}
+                    targetSize={300}
+                    padding={22}
+                    className="shared-page-preview-icon"
+                  />
+                </div>
+
+                <label className="export-share-pane-label shared-page-scale">
+                  <span>PNG scale</span>
+                  <div className="size-quick-row">
+                    {EXPORT_SCALE_OPTIONS.map((scale) => (
+                      <button
+                        type="button"
+                        key={scale}
+                        className={exportScale === scale ? "size-chip active" : "size-chip"}
+                        onClick={() => setExportScale(scale)}
+                      >
+                        {scale}x
+                      </button>
+                    ))}
+                  </div>
+                  <small>{exportSizeSummary}</small>
+                </label>
+
+                <div className="shared-page-actions">
+                  <button type="button" className="btn-primary" onClick={handleExport}>
+                    Export PNG
+                  </button>
+                  <a className="btn-secondary" href={editorShareUrl}>
+                    Edit in Iquan editor
+                  </a>
+                  <a className="btn-ghost" href={builderHomeUrl}>
+                    Back to Iquan
+                  </a>
+                </div>
+              </>
+            ) : null}
+
+            {isUnsupportedSharedPage ? (
+              <div className="shared-page-state">
+                <p className="shared-page-eyebrow">Shared from Iquan</p>
+                <h1>This shared icon uses uploaded images</h1>
+                <p className="helper">
+                  Copied links do not include uploaded image pixels yet, so this page cannot
+                  reconstruct the exact shared icon. Use the full share code for image-backed work.
+                </p>
+                <div className="shared-page-actions">
+                  <a className="btn-primary" href={editorShareUrl}>
+                    Edit in Iquan editor
+                  </a>
+                  <a className="btn-ghost" href={builderHomeUrl}>
+                    Back to Iquan
+                  </a>
+                </div>
+              </div>
+            ) : null}
+
+            {isInvalidSharedPage || isMissingSharedPage ? (
+              <div className="shared-page-state">
+                <p className="shared-page-eyebrow">Shared from Iquan</p>
+                <h1>
+                  {isInvalidSharedPage
+                    ? "This shared link is invalid"
+                    : "This shared link is missing its icon code"}
+                </h1>
+                <p className="helper">
+                  {isInvalidSharedPage
+                    ? "The copied link could not be decoded into an icon."
+                    : "There is no shared icon attached to this link."}
+                </p>
+                <div className="shared-page-actions">
+                  <a className="btn-primary" href={builderHomeUrl}>
+                    Open Iquan editor
+                  </a>
+                </div>
+              </div>
+            ) : null}
+          </section>
+
+          {exportCaptureBuffer}
+          {aboutModal}
+          {toast ? <div className="toast">{toast}</div> : null}
+        </main>
+      </div>
+    );
+  }
+
   return (
-    <div className="app-shell">
+    <div className="app-shell" data-ui-phase={uiPhase}>
       <header className="app-header" aria-live="polite">
         <div className="app-header-side">
           <button
@@ -4256,9 +5874,15 @@ function App() {
             <Trash2 size={16} aria-hidden="true" />
           </button>
         </div>
-        <div className="app-header-title">
+        <button
+          type="button"
+          className="app-header-title app-header-title-link"
+          onClick={handleReturnToLanding}
+          aria-label="Return to Iquan home screen"
+          title="Return to Iquan home screen"
+        >
           Iquan Icon Builder
-        </div>
+        </button>
         <div className="app-header-side app-header-side-end">
           <button
             type="button"
@@ -4278,6 +5902,7 @@ function App() {
         </div>
 
         <aside ref={controlsRef} className="controls">
+          <div className="controls-content" aria-hidden={isHeroVisible}>
         <div className="editor-target-banner">
           <div className="editor-target-head">
             <h2 className="editor-target-title">
@@ -4381,534 +6006,607 @@ function App() {
           </section>
         ) : null}
 
-        <section className="section-panel">
-          <h2>Content</h2>
-          <ToggleGroup
-            options={MODES}
-            value={state.mode}
-            onChange={(mode) => patchState({ mode })}
-            labels={MODE_TOGGLE_LABELS}
-          />
-
-          {state.mode === "text" ? (
-            <>
-              <label>
-                Text or emoji
-                <input
-                  type="text"
-                  value={state.content}
-                  maxLength={12}
-                  onChange={(event) => patchState({ content: event.target.value })}
-                  placeholder="A, OK, 🙂"
-                />
-              </label>
-              <label>
-                <span className="label-head">
-                  Font type
-                  <HelpHint text={ADVANCED_HELP.fontFamily} setTooltip={setCursorTooltip} />
-                </span>
-                <button
-                  type="button"
-                  className="btn-secondary font-picker-trigger"
-                  onClick={() => setFontPickerOpen(true)}
-                >
-                  <span className="font-picker-trigger-title">{selectedFontLabel}</span>
-                  <span className="font-picker-trigger-preview" style={{ fontFamily: state.fontFamily }}>
-                    Aa Bb 123
-                  </span>
-                </button>
-              </label>
-
-              <label>
-                <span className="label-head">
-                  Font weight
-                  <HelpHint text={ADVANCED_HELP.fontWeight} setTooltip={setCursorTooltip} />
-                </span>
-                <input
-                  type="range"
-                  min={FONT_WEIGHT_MIN}
-                  max={FONT_WEIGHT_MAX}
-                  step={100}
-                  list="font-weight-stops"
-                  value={Number.parseInt(state.fontWeight, 10)}
-                  onChange={(event) =>
-                    patchState({ fontWeight: String(Number(event.target.value)) })
-                  }
-                />
-                <small>{state.fontWeight}</small>
-              </label>
-              <datalist id="font-weight-stops">
-                {FONT_WEIGHT_STOPS.map((weight) => (
-                  <option key={weight} value={weight} />
-                ))}
-              </datalist>
-            </>
-          ) : state.mode === "image" ? (
-            <>
-              <ImageEditorControls
-                targetLabel="Content image"
-                inputRef={contentImageUploadInputRef}
-                imageState={getImageStateForTarget(state, "content")}
-                onFileChange={(event) => handleImageFileChange(event, "content")}
-                onUpload={() => handleUploadImageClick("content")}
-                onRecrop={() => handleRecropExistingImage("content")}
-                onRemove={() => handleRemoveImage("content")}
-                onPatch={(patch) => patchState(patch)}
+        <SectionPanel
+          title="Content"
+          isOpen={isContentSectionOpen}
+          onToggleOpen={() => setContentSectionOpen((open) => !open)}
+          isEnabled={isContentSectionEnabled}
+          onToggleEnabled={handleContentSectionEnabledChange}
+          headerPreview={<ContentSectionHeaderPreview state={state} />}
+        >
+          <>
+              <ToggleGroup
+                options={MODES}
+                value={state.mode}
+                onChange={(mode) => patchState({ mode })}
+                labels={MODE_TOGGLE_LABELS}
               />
-            </>
-          ) : state.mode === "none" ? (
-            <p className="helper">No content will be rendered.</p>
-          ) : (
-            <>
-              <label>
-                Icon name
-                <input
-                  type="text"
-                  value={state.lucide}
-                  onChange={(event) => patchState({ lucide: event.target.value })}
-                  onBlur={(event) =>
-                    patchState({
-                      lucide:
-                        normalizeLucideName(event.target.value) || DEFAULT_STATE.lucide,
-                    })
-                  }
-                  placeholder="sparkles, bell-ring, chart-line"
-                />
-                <div className="field-actions">
-                  <button
-                    type="button"
-                    className="btn-ghost"
-                    onClick={() => setIconPickerOpen(true)}
-                  >
-                    Browse all icons
-                  </button>
-                </div>
-                <span className={activeMetrics.hasValidLucide ? "status ok" : "status warn"}>
-                  {activeMetrics.hasValidLucide
-                    ? `Loaded ${activeMetrics.iconName}`
-                    : "Name not found, using sparkles"}
-                </span>
-              </label>
-              <label>
-                <span className="label-head">
-                  Icon stroke weight
-                  <HelpHint text={ADVANCED_HELP.lucideWeight} setTooltip={setCursorTooltip} />
-                </span>
-                <input
-                  type="range"
-                  min={LUCIDE_WEIGHT_MIN}
-                  max={LUCIDE_WEIGHT_MAX}
-                  step={0.4}
-                  list="lucide-weight-stops"
-                  value={state.lucideWeight}
-                  onChange={(event) =>
-                    patchState({ lucideWeight: Number.parseFloat(event.target.value) })
-                  }
-                />
-                <small>{state.lucideWeight.toFixed(1)}px</small>
-              </label>
-              <datalist id="lucide-weight-stops">
-                {LUCIDE_WEIGHT_STOPS.map((weight) => (
-                  <option key={weight} value={weight} />
-                ))}
-              </datalist>
-            </>
-          )}
 
-          <label>
-            <span className="label-head">
-              Icon size in base
-              <HelpHint text={ADVANCED_HELP.iconScale} setTooltip={setCursorTooltip} />
-            </span>
-            <input
-              type="range"
-              min={ICON_SCALE_MIN}
-              max={ICON_SCALE_MAX}
-              step={2}
-              value={state.iconScale}
-              onChange={(event) => handleIconScaleChange(Number(event.target.value))}
-            />
-            <div className="size-quick-row">
-              <button
-                type="button"
-                className={state.iconScale === 60 ? "size-chip active" : "size-chip"}
-                onClick={() => handleIconScaleChange(60)}
-              >
-                S
-              </button>
-              <button
-                type="button"
-                className={state.iconScale === 80 ? "size-chip active" : "size-chip"}
-                onClick={() => handleIconScaleChange(80)}
-              >
-                M
-              </button>
-              <button
-                type="button"
-                className={state.iconScale === 100 ? "size-chip active" : "size-chip"}
-                onClick={() => handleIconScaleChange(100)}
-              >
-                L
-              </button>
-            </div>
-            <small>
-              {state.iconScale}% of the base
-            </small>
-            {isTextScaleCappedByLink ? (
-              <small className="status warn">
-                Text size is capped by linked base sizing. Open Advanced and turn off Link text
-                size to base size.
-              </small>
-            ) : null}
-          </label>
-
-          <button
-            type="button"
-            className={
-              isContentAdvancedOpen
-                ? "btn-ghost section-advanced-toggle active"
-                : "btn-ghost section-advanced-toggle"
-            }
-            onClick={() => setContentAdvancedOpen((open) => !open)}
-            aria-expanded={isContentAdvancedOpen}
-          >
-            <span
-              className={
-                isContentAdvancedOpen
-                  ? "section-advanced-chevron open"
-                  : "section-advanced-chevron"
-              }
-              aria-hidden="true"
-            >
-              ▸
-            </span>
-            Advanced
-          </button>
-
-          {isContentAdvancedOpen ? (
-            <div className="advanced-content">
               {state.mode === "text" ? (
                 <>
-                  <label className="advanced-check">
+                  <label>
+                    Text or emoji
                     <input
-                      type="checkbox"
-                      checked={state.linkTextToSize}
-                      onChange={(event) => patchState({ linkTextToSize: event.target.checked })}
+                      type="text"
+                      value={state.content}
+                      maxLength={12}
+                      onChange={(event) => patchState({ content: event.target.value })}
+                      placeholder="A, OK, 🙂"
                     />
-                    <span className="label-head">
-                      Link text size to base size
-                      <HelpHint text={ADVANCED_HELP.linkTextToSize} setTooltip={setCursorTooltip} />
-                    </span>
                   </label>
-                  <small>Turn this off to let Icon size in base control text size directly.</small>
+                  <label>
+                    <span className="label-head">
+                      Font type
+                      <HelpHint text={ADVANCED_HELP.fontFamily} setTooltip={setCursorTooltip} />
+                    </span>
+                    <button
+                      type="button"
+                      className="btn-secondary font-picker-trigger"
+                      onClick={() => setFontPickerOpen(true)}
+                    >
+                      <span className="font-picker-trigger-title">{selectedFontLabel}</span>
+                      <span className="font-picker-trigger-preview" style={{ fontFamily: state.fontFamily }}>
+                        Aa Bb 123
+                      </span>
+                    </button>
+                  </label>
 
                   <label>
                     <span className="label-head">
-                      Letter spacing
-                      <HelpHint text={ADVANCED_HELP.letterSpacing} setTooltip={setCursorTooltip} />
+                      Font weight
+                      <HelpHint text={ADVANCED_HELP.fontWeight} setTooltip={setCursorTooltip} />
                     </span>
                     <input
                       type="range"
-                      min={0}
-                      max={20}
-                      step={1}
-                      value={state.spacing}
-                      onChange={(event) => patchState({ spacing: Number(event.target.value) })}
+                      min={FONT_WEIGHT_MIN}
+                      max={FONT_WEIGHT_MAX}
+                      step={100}
+                      list="font-weight-stops"
+                      value={Number.parseInt(state.fontWeight, 10)}
+                      onChange={(event) =>
+                        patchState({ fontWeight: String(Number(event.target.value)) })
+                      }
                     />
-                    <small>{state.spacing}px</small>
+                    <small>{state.fontWeight}</small>
                   </label>
+                  <datalist id="font-weight-stops">
+                    {FONT_WEIGHT_STOPS.map((weight) => (
+                      <option key={weight} value={weight} />
+                    ))}
+                  </datalist>
+                </>
+              ) : state.mode === "image" ? (
+                <ImageEditorControls
+                  targetLabel="Content image"
+                  inputRef={contentImageUploadInputRef}
+                  imageState={getImageStateForTarget(state, "content")}
+                  exportSizeLabel="Use content image size for export"
+                  exportSizeSummary={
+                    baseState.contentEnabled && baseState.mode === "image" && preferredImageExportDimensions
+                      ? exportSizeSummary
+                      : "Export uses the 500 x 500 square canvas until this image is active in the base composition."
+                  }
+                  isExportSizeEnabled={
+                    baseState.contentEnabled && baseState.mode === "image" && Boolean(preferredImageExportDimensions)
+                  }
+                  isUsingExportImageSize={
+                    baseState.contentEnabled && baseState.mode === "image" && shouldUseImportedImageExportSize
+                  }
+                  onExportSizeToggle={setUseImportedImageExportSize}
+                  onFileChange={(event) => handleImageFileChange(event, "content")}
+                  onUpload={() => handleUploadImageClick("content")}
+                  onRecrop={() => handleRecropExistingImage("content")}
+                  onRemove={() => handleRemoveImage("content")}
+                  onPatch={(patch) => patchState(patch)}
+                />
+              ) : state.mode === "none" ? (
+                <p className="helper">No content will be rendered.</p>
+              ) : (
+                <>
+                  <label>
+                    Icon name
+                    <input
+                      type="text"
+                      value={state.lucide}
+                      onChange={(event) => patchState({ lucide: event.target.value })}
+                      onBlur={(event) =>
+                        patchState({
+                          lucide:
+                            normalizeLucideName(event.target.value) || DEFAULT_STATE.lucide,
+                        })
+                      }
+                      placeholder="sparkles, bell-ring, chart-line"
+                    />
+                    <div className="field-actions">
+                      <button
+                        type="button"
+                        className="btn-ghost"
+                        onClick={() => setIconPickerOpen(true)}
+                      >
+                        Browse all icons
+                      </button>
+                    </div>
+                    <span className={activeMetrics.hasValidLucide ? "status ok" : "status warn"}>
+                      {activeMetrics.hasValidLucide
+                        ? `Loaded ${activeMetrics.iconName}`
+                        : "Name not found, using sparkles"}
+                    </span>
+                  </label>
+                  <label>
+                    <span className="label-head">
+                      Icon stroke weight
+                      <HelpHint text={ADVANCED_HELP.lucideWeight} setTooltip={setCursorTooltip} />
+                    </span>
+                    <input
+                      type="range"
+                      min={LUCIDE_WEIGHT_MIN}
+                      max={LUCIDE_WEIGHT_MAX}
+                      step={0.4}
+                      list="lucide-weight-stops"
+                      value={state.lucideWeight}
+                      onChange={(event) =>
+                        patchState({ lucideWeight: Number.parseFloat(event.target.value) })
+                      }
+                    />
+                    <small>{state.lucideWeight.toFixed(1)}px</small>
+                  </label>
+                  <datalist id="lucide-weight-stops">
+                    {LUCIDE_WEIGHT_STOPS.map((weight) => (
+                      <option key={weight} value={weight} />
+                    ))}
+                  </datalist>
+                </>
+              )}
+
+              {state.mode !== "none" ? (
+                <label>
+                  <span className="label-head">
+                    Icon size in base
+                    <HelpHint text={ADVANCED_HELP.iconScale} setTooltip={setCursorTooltip} />
+                  </span>
+                  <input
+                    type="range"
+                    min={ICON_SCALE_MIN}
+                    max={ICON_SCALE_MAX}
+                    step={2}
+                    value={state.iconScale}
+                    onChange={(event) => handleIconScaleChange(Number(event.target.value))}
+                  />
+                  <div className="size-quick-row">
+                    <button
+                      type="button"
+                      className={state.iconScale === 60 ? "size-chip active" : "size-chip"}
+                      onClick={() => handleIconScaleChange(60)}
+                    >
+                      S
+                    </button>
+                    <button
+                      type="button"
+                      className={state.iconScale === 80 ? "size-chip active" : "size-chip"}
+                      onClick={() => handleIconScaleChange(80)}
+                    >
+                      M
+                    </button>
+                    <button
+                      type="button"
+                      className={state.iconScale === 100 ? "size-chip active" : "size-chip"}
+                      onClick={() => handleIconScaleChange(100)}
+                    >
+                      L
+                    </button>
+                  </div>
+                  <small>
+                    {state.iconScale}% of the base
+                  </small>
+                  {isTextScaleCappedByLink ? (
+                    <small className="status warn">
+                      Text size is capped by linked base sizing. Open Advanced and turn off Link text
+                      size to base size.
+                    </small>
+                  ) : null}
+                </label>
+              ) : null}
+
+              {state.mode === "text" ? (
+                <>
+                  <button
+                    type="button"
+                    className={
+                      isContentAdvancedOpen
+                        ? "btn-ghost section-advanced-toggle active"
+                        : "btn-ghost section-advanced-toggle"
+                    }
+                    onClick={() => setContentAdvancedOpen((open) => !open)}
+                    aria-expanded={isContentAdvancedOpen}
+                  >
+                    <span
+                      className={
+                        isContentAdvancedOpen
+                          ? "section-advanced-chevron open"
+                          : "section-advanced-chevron"
+                      }
+                      aria-hidden="true"
+                    >
+                      ▸
+                    </span>
+                    Advanced
+                  </button>
+
+                  {isContentAdvancedOpen ? (
+                    <div className="advanced-content">
+                      <label className="advanced-check">
+                        <input
+                          type="checkbox"
+                          checked={state.linkTextToSize}
+                          onChange={(event) => patchState({ linkTextToSize: event.target.checked })}
+                        />
+                        <span className="label-head">
+                          Link text size to base size
+                          <HelpHint text={ADVANCED_HELP.linkTextToSize} setTooltip={setCursorTooltip} />
+                        </span>
+                      </label>
+                      <small>Turn this off to let Icon size in base control text size directly.</small>
+
+                      <label>
+                        <span className="label-head">
+                          Letter spacing
+                          <HelpHint text={ADVANCED_HELP.letterSpacing} setTooltip={setCursorTooltip} />
+                        </span>
+                        <input
+                          type="range"
+                          min={0}
+                          max={20}
+                          step={1}
+                          value={state.spacing}
+                          onChange={(event) => patchState({ spacing: Number(event.target.value) })}
+                        />
+                        <small>{state.spacing}px</small>
+                      </label>
+                    </div>
+                  ) : null}
                 </>
               ) : null}
-            </div>
-          ) : null}
-        </section>
+          </>
+        </SectionPanel>
 
-        <section className="section-panel">
-          <h2>Shape</h2>
-          <label>
-            <span className="label-head">
-              Base size
-              <HelpHint text={ADVANCED_HELP.baseSize} setTooltip={setCursorTooltip} />
-            </span>
-            <input
-              type="range"
-              min={ICON_BASE_SIZE_MIN}
-              max={ICON_BASE_SIZE_MAX}
-              step={2}
-              value={state.size}
-              onChange={(event) => patchState({ size: Number(event.target.value) })}
-            />
-            <div className="size-quick-row">
-              {ICON_BASE_SIZE_PRESETS.map((presetSize) => (
-                <button
-                  type="button"
-                  key={presetSize}
-                  className={state.size === presetSize ? "size-chip active" : "size-chip"}
-                  onClick={() => patchState({ size: presetSize })}
-                >
-                  {presetSize}
-                </button>
-              ))}
-            </div>
-            <small>{state.size}px</small>
-          </label>
-
-          <ToggleGroup
-            options={SHAPES}
-            value={state.shape}
-            onChange={(shape) => patchState({ shape })}
-          />
-
-          {state.shape === "image" ? (
-            <>
-              <ImageEditorControls
-                targetLabel="Shape image"
-                inputRef={shapeImageUploadInputRef}
-                imageState={getImageStateForTarget(state, "shape")}
-                onFileChange={(event) => handleImageFileChange(event, "shape")}
-                onUpload={() => handleUploadImageClick("shape")}
-                onRecrop={() => handleRecropExistingImage("shape")}
-                onRemove={() => handleRemoveImage("shape")}
-                onPatch={(patch) =>
-                  patchState(getImagePatchForTarget("shape", { ...getImageStateForTarget(state, "shape"), ...patch }))
-                }
-              />
-
-              <label>
-                Corner radius
-                <input
-                  type="range"
-                  min={0}
-                  max={80}
-                  step={2}
-                  value={state.radius}
-                  onChange={(event) => patchState({ radius: Number(event.target.value) })}
-                />
-                <small>{state.radius}px</small>
-              </label>
-            </>
-          ) : state.shape === "rectangle" ? (
-            <label>
-              Width scale
-              <input
-                type="range"
-                min={100}
-                max={260}
-                step={20}
-                value={state.widthScale}
-                onChange={(event) =>
-                  patchState({ widthScale: Number(event.target.value) })
-                }
-              />
-              <small>{(state.widthScale / 100).toFixed(1)}x</small>
-            </label>
-          ) : state.shape === "pill" ? (
-            <>
-              <label>
-                Width scale
-                <input
-                  type="range"
-                  min={110}
-                  max={240}
-                  step={10}
-                  value={state.pillWidthScale}
-                  onChange={(event) =>
-                    patchState({ pillWidthScale: Number(event.target.value) })
-                  }
-                />
-                <small>{(state.pillWidthScale / 100).toFixed(1)}x</small>
-              </label>
-              <label>
-                Height scale
-                <input
-                  type="range"
-                  min={60}
-                  max={110}
-                  step={2}
-                  value={state.pillHeightScale}
-                  onChange={(event) =>
-                    patchState({ pillHeightScale: Number(event.target.value) })
-                  }
-                />
-                <small>{(state.pillHeightScale / 100).toFixed(2)}x</small>
-              </label>
-            </>
-          ) : (
-            <label>
-              Corner radius
-              <input
-                type="range"
-                min={0}
-                max={80}
-                step={2}
-                value={state.radius}
-                onChange={(event) => patchState({ radius: Number(event.target.value) })}
-                disabled={state.shape === "circle" || state.shape === "pill"}
-              />
-              <small>{state.radius}px</small>
-            </label>
-          )}
-
-          <button
-            type="button"
-            className={
-              isShapeAdvancedOpen
-                ? "btn-ghost section-advanced-toggle active"
-                : "btn-ghost section-advanced-toggle"
-            }
-            onClick={() => setShapeAdvancedOpen((open) => !open)}
-            aria-expanded={isShapeAdvancedOpen}
-          >
-            <span
-              className={
-                isShapeAdvancedOpen
-                  ? "section-advanced-chevron open"
-                  : "section-advanced-chevron"
-              }
-              aria-hidden="true"
-            >
-              ▸
-            </span>
-            Advanced
-          </button>
-
-          {isShapeAdvancedOpen ? (
-            <div className="advanced-content">
+        <SectionPanel
+          title="Shape"
+          isOpen={isShapeSectionOpen}
+          onToggleOpen={() => setShapeSectionOpen((open) => !open)}
+          isEnabled={isShapeSectionEnabled}
+          onToggleEnabled={handleShapeSectionEnabledChange}
+          headerPreview={<ShapeSectionHeaderPreview state={state} />}
+        >
+          <>
               <label>
                 <span className="label-head">
-                  Safe inset
-                  <HelpHint text={ADVANCED_HELP.inset} setTooltip={setCursorTooltip} />
+                  Base size
+                  <HelpHint text={ADVANCED_HELP.baseSize} setTooltip={setCursorTooltip} />
                 </span>
                 <input
                   type="range"
-                  min={6}
-                  max={40}
-                  step={1}
-                  value={state.inset}
-                  onChange={(event) => patchState({ inset: Number(event.target.value) })}
+                  min={ICON_BASE_SIZE_MIN}
+                  max={ICON_BASE_SIZE_MAX}
+                  step={2}
+                  value={state.size}
+                  onChange={(event) => patchState({ size: Number(event.target.value) })}
                 />
-                <small>{state.inset}px</small>
+                <div className="size-quick-row">
+                  {ICON_BASE_SIZE_PRESETS.map((presetSize) => (
+                    <button
+                      type="button"
+                      key={presetSize}
+                      className={state.size === presetSize ? "size-chip active" : "size-chip"}
+                      onClick={() => patchState({ size: presetSize })}
+                    >
+                      {presetSize}
+                    </button>
+                  ))}
+                </div>
+                <small>{state.size}px</small>
               </label>
-            </div>
-          ) : null}
-        </section>
 
-        <section className="section-panel">
-          <h2>Color</h2>
-          <div className="color-controls-grid">
-            <GradientColorControl
-              label="Fill"
-              stops={state.fillStops}
-              gradientType={state.fillGradientType}
-              angle={state.fillGradientAngle}
-              centerX={state.fillGradientCenterX}
-              centerY={state.fillGradientCenterY}
-              onStopChange={(index, value) => handleGradientStopChange("fillStops", index, value)}
-              onAddStop={() => handleGradientStopAdd("fillStops")}
-              onRemoveStop={(index) => handleGradientStopRemove("fillStops", index)}
-              onGradientTypeChange={(type) => patchState({ fillGradientType: type })}
-              onAngleChange={(nextAngle) => patchState({ fillGradientAngle: nextAngle })}
-              onCenterChange={(x, y) =>
-                patchState({ fillGradientCenterX: x, fillGradientCenterY: y })
-              }
-            />
-            <label className="color-dot-control">
-              <span>Content</span>
-              <input
-                type="color"
-                value={state.textColor}
-                onChange={(event) => handleColorChange("textColor", event.target.value)}
+              <ToggleGroup
+                options={SHAPE_MODE_OPTIONS}
+                value={selectedShapeMode}
+                onChange={(shapeMode) =>
+                  patchState({ shape: shapeMode === "shape" ? "shape" : shapeMode })
+                }
+                labels={SHAPE_MODE_LABELS}
               />
-            </label>
-            <GradientColorControl
-              label="Stroke"
-              stops={state.strokeStops}
-              gradientType={state.strokeGradientType}
-              angle={state.strokeGradientAngle}
-              centerX={state.strokeGradientCenterX}
-              centerY={state.strokeGradientCenterY}
-              onStopChange={(index, value) => handleGradientStopChange("strokeStops", index, value)}
-              onAddStop={() => handleGradientStopAdd("strokeStops")}
-              onRemoveStop={(index) => handleGradientStopRemove("strokeStops", index)}
-              onGradientTypeChange={(type) => patchState({ strokeGradientType: type })}
-              onAngleChange={(nextAngle) => patchState({ strokeGradientAngle: nextAngle })}
-              onCenterChange={(x, y) =>
-                patchState({ strokeGradientCenterX: x, strokeGradientCenterY: y })
-              }
-            />
-            <label className="color-dot-control">
-              <span>Back</span>
-              <input
-                type="color"
-                value={state.backColor}
-                onChange={(event) => handleColorChange("backColor", event.target.value)}
+
+              {selectedShapeMode === "shape" ? (
+                <>
+                  <label>
+                    <span>Preset</span>
+                    <div className="size-quick-row shape-preset-row">
+                      {SHAPE_PRESET_OPTIONS.map((presetShape) => (
+                        <button
+                          type="button"
+                          key={presetShape}
+                          className={activeShapePreset === presetShape ? "size-chip active" : "size-chip"}
+                          onClick={() => applyShapePreset(presetShape)}
+                        >
+                          {SHAPE_TOGGLE_LABELS[presetShape]}
+                        </button>
+                      ))}
+                    </div>
+                  </label>
+
+                  <label>
+                    Width scale
+                    <input
+                      type="range"
+                      min={ICON_SCALE_MIN}
+                      max={260}
+                      step={2}
+                      value={state.widthScale}
+                      onChange={(event) =>
+                        patchState({ widthScale: Number(event.target.value) })
+                      }
+                    />
+                    <small>{(state.widthScale / 100).toFixed(2)}x</small>
+                  </label>
+
+                  <label>
+                    Height scale
+                    <input
+                      type="range"
+                      min={SHAPE_HEIGHT_SCALE_MIN}
+                      max={SHAPE_HEIGHT_SCALE_MAX}
+                      step={2}
+                      value={state.heightScale}
+                      onChange={(event) =>
+                        patchState({ heightScale: Number(event.target.value) })
+                      }
+                    />
+                    <small>{(state.heightScale / 100).toFixed(2)}x</small>
+                  </label>
+
+                  <label>
+                    Corner rounding
+                    <input
+                      type="range"
+                      min={0}
+                      max={SHAPE_RADIUS_MAX}
+                      step={2}
+                      value={state.radius}
+                      onChange={(event) => patchState({ radius: Number(event.target.value) })}
+                    />
+                    <small>{state.radius}px</small>
+                  </label>
+                </>
+              ) : state.shape === "image" ? (
+                <>
+                  <ImageEditorControls
+                    targetLabel="Shape image"
+                    inputRef={shapeImageUploadInputRef}
+                    imageState={getImageStateForTarget(state, "shape")}
+                    exportSizeLabel="Use shape image size for export"
+                    exportSizeSummary={
+                      baseState.shapeEnabled && baseState.shape === "image" && preferredImageExportDimensions
+                        ? exportSizeSummary
+                        : "Export uses the 500 x 500 square canvas until this shape image is active in the base composition."
+                    }
+                    isExportSizeEnabled={
+                      baseState.shapeEnabled && baseState.shape === "image" && Boolean(preferredImageExportDimensions)
+                    }
+                    isUsingExportImageSize={
+                      baseState.shapeEnabled && baseState.shape === "image" && shouldUseImportedImageExportSize
+                    }
+                    onExportSizeToggle={setUseImportedImageExportSize}
+                    onFileChange={(event) => handleImageFileChange(event, "shape")}
+                    onUpload={() => handleUploadImageClick("shape")}
+                    onRecrop={() => handleRecropExistingImage("shape")}
+                    onRemove={() => handleRemoveImage("shape")}
+                    onPatch={(patch) =>
+                      patchState(getImagePatchForTarget("shape", { ...getImageStateForTarget(state, "shape"), ...patch }))
+                    }
+                  />
+
+                  <label>
+                    Corner radius
+                    <input
+                      type="range"
+                      min={0}
+                      max={80}
+                      step={2}
+                      value={state.radius}
+                      onChange={(event) => patchState({ radius: Number(event.target.value) })}
+                    />
+                    <small>{state.radius}px</small>
+                  </label>
+                </>
+              ) : null}
+
+              <button
+                type="button"
+                className={
+                  isShapeAdvancedOpen
+                    ? "btn-ghost section-advanced-toggle active"
+                    : "btn-ghost section-advanced-toggle"
+                }
+                onClick={() => setShapeAdvancedOpen((open) => !open)}
+                aria-expanded={isShapeAdvancedOpen}
+              >
+                <span
+                  className={
+                    isShapeAdvancedOpen
+                      ? "section-advanced-chevron open"
+                      : "section-advanced-chevron"
+                  }
+                  aria-hidden="true"
+                >
+                  ▸
+                </span>
+                Advanced
+              </button>
+
+              {isShapeAdvancedOpen ? (
+                <div className="advanced-content">
+                  <label>
+                    <span className="label-head">
+                      Safe inset
+                      <HelpHint text={ADVANCED_HELP.inset} setTooltip={setCursorTooltip} />
+                    </span>
+                    <input
+                      type="range"
+                      min={6}
+                      max={40}
+                      step={1}
+                      value={state.inset}
+                      onChange={(event) => patchState({ inset: Number(event.target.value) })}
+                    />
+                    <small>{state.inset}px</small>
+                  </label>
+                </div>
+              ) : null}
+          </>
+        </SectionPanel>
+
+        <SectionPanel
+          title="Color"
+          isOpen={isColorSectionOpen}
+          onToggleOpen={() => setColorSectionOpen((open) => !open)}
+          isEnabled={isColorSectionEnabled}
+          onToggleEnabled={setColorSectionEnabled}
+          headerPreview={<ColorSectionHeaderPreview state={state} />}
+        >
+          <>
+              <div className="color-controls-grid">
+                <GradientColorControl
+                  label="Fill"
+                  stops={state.fillStops}
+                  gradientType={state.fillGradientType}
+                  angle={state.fillGradientAngle}
+                  centerX={state.fillGradientCenterX}
+                  centerY={state.fillGradientCenterY}
+                  onStopChange={(index, value) => handleGradientStopChange("fillStops", index, value)}
+                  onAddStop={() => handleGradientStopAdd("fillStops")}
+                  onRemoveStop={(index) => handleGradientStopRemove("fillStops", index)}
+                  onGradientTypeChange={(type) => patchState({ fillGradientType: type })}
+                  onAngleChange={(nextAngle) => patchState({ fillGradientAngle: nextAngle })}
+                  onCenterChange={(x, y) =>
+                    patchState({ fillGradientCenterX: x, fillGradientCenterY: y })
+                  }
+                />
+                <label className="color-dot-control">
+                  <span>Content</span>
+                  <input
+                    type="color"
+                    value={state.textColor}
+                    onChange={(event) => handleColorChange("textColor", event.target.value)}
+                  />
+                </label>
+                <GradientColorControl
+                  label="Stroke"
+                  stops={state.strokeStops}
+                  gradientType={state.strokeGradientType}
+                  angle={state.strokeGradientAngle}
+                  centerX={state.strokeGradientCenterX}
+                  centerY={state.strokeGradientCenterY}
+                  onStopChange={(index, value) => handleGradientStopChange("strokeStops", index, value)}
+                  onAddStop={() => handleGradientStopAdd("strokeStops")}
+                  onRemoveStop={(index) => handleGradientStopRemove("strokeStops", index)}
+                  onGradientTypeChange={(type) => patchState({ strokeGradientType: type })}
+                  onAngleChange={(nextAngle) => patchState({ strokeGradientAngle: nextAngle })}
+                  onCenterChange={(x, y) =>
+                    patchState({ strokeGradientCenterX: x, strokeGradientCenterY: y })
+                  }
+                />
+                <label className="color-dot-control">
+                  <span>Back</span>
+                  <input
+                    type="color"
+                    value={state.backColor}
+                    onChange={(event) => handleColorChange("backColor", event.target.value)}
+                  />
+                </label>
+              </div>
+
+              <label>
+                Stroke width
+                <input
+                  type="range"
+                  min={0}
+                  max={24}
+                  step={1}
+                  value={state.outline}
+                  onChange={(event) => patchState({ outline: Number(event.target.value) })}
+                />
+                <small>{state.outline}px</small>
+              </label>
+
+              <label>
+                Base transparency
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  step={1}
+                  value={state.baseOpacity}
+                  onChange={(event) => patchState({ baseOpacity: Number(event.target.value) })}
+                />
+                <small>{state.baseOpacity}%</small>
+              </label>
+
+              <label>
+                Content transparency
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  step={1}
+                  value={state.contentOpacity}
+                  onChange={(event) =>
+                    patchState({ contentOpacity: Number(event.target.value) })
+                  }
+                />
+                <small>{state.contentOpacity}%</small>
+              </label>
+          </>
+        </SectionPanel>
+
+        <SectionPanel
+          title="Back layer wheel"
+          isOpen={isBackLayerSectionOpen}
+          onToggleOpen={() => setBackLayerSectionOpen((open) => !open)}
+          isEnabled={isBackLayerSectionEnabled}
+          onToggleEnabled={handleBackLayerSectionEnabledChange}
+          headerPreview={<BackLayerSectionHeaderPreview state={state} />}
+        >
+          <>
+              <BackLayerWheel
+                angle={state.backAngle}
+                distance={state.backDistance}
+                onChange={handleBackLayerChange}
+                lockDistance={isBackDistanceLocked}
+                lockAngle={isBackAngleLocked}
+                onLockDistanceChange={setBackDistanceLocked}
+                onLockAngleChange={setBackAngleLocked}
               />
-            </label>
+              <button
+                type="button"
+                className="btn-ghost"
+                disabled={isBackDistanceLocked}
+                onClick={() => patchState({ backDistance: 0 })}
+              >
+                Reset back layer
+              </button>
+          </>
+        </SectionPanel>
+
           </div>
-
-          <label>
-            Stroke width
-            <input
-              type="range"
-              min={0}
-              max={24}
-              step={1}
-              value={state.outline}
-              onChange={(event) => patchState({ outline: Number(event.target.value) })}
-            />
-            <small>{state.outline}px</small>
-          </label>
-
-          <label>
-            Base transparency
-            <input
-              type="range"
-              min={0}
-              max={100}
-              step={1}
-              value={state.baseOpacity}
-              onChange={(event) => patchState({ baseOpacity: Number(event.target.value) })}
-            />
-            <small>{state.baseOpacity}%</small>
-          </label>
-
-          <label>
-            Content transparency
-            <input
-              type="range"
-              min={0}
-              max={100}
-              step={1}
-              value={state.contentOpacity}
-              onChange={(event) =>
-                patchState({ contentOpacity: Number(event.target.value) })
-              }
-            />
-            <small>{state.contentOpacity}%</small>
-          </label>
-        </section>
-
-        <section className="section-panel">
-          <h2>Back layer wheel</h2>
-          <BackLayerWheel
-            angle={state.backAngle}
-            distance={state.backDistance}
-            onChange={handleBackLayerChange}
-            lockDistance={isBackDistanceLocked}
-            lockAngle={isBackAngleLocked}
-            onLockDistanceChange={setBackDistanceLocked}
-            onLockAngleChange={setBackAngleLocked}
-          />
-          <button
-            type="button"
-            className="btn-ghost"
-            disabled={isBackDistanceLocked}
-            onClick={() => patchState({ backDistance: 0 })}
-          >
-            Reset back layer
-          </button>
-        </section>
-
+          <div className="controls-hero" aria-hidden={!isHeroVisible}>
+            <div className="controls-hero-content">
+              <p className="controls-hero-eyebrow">Iquan</p>
+              <h1>Need a quick icon? Iquan it</h1>
+              <p className="controls-hero-copy">{HERO_DESCRIPTION}</p>
+              <button type="button" className="btn-primary controls-hero-cta" onClick={handleStartBuilder}>
+                Get Started
+              </button>
+            </div>
+          </div>
         </aside>
       </div>
 
@@ -4918,167 +6616,223 @@ function App() {
         </div>
 
         <main className={previewContextMode === "message" ? "preview preview-message-mode" : "preview"}>
-          <div className="preview-header">
-            <span>
-              Base {baseMetrics.dimensions.width} x {baseMetrics.dimensions.height} in{" "}
-              {canvasSize} x {canvasSize} canvas |{" "}
-              {baseState.mode === "text"
-                ? `fit ${baseMetrics.fittedFontSize}px`
-                : baseMetrics.iconName}
-            </span>
-          </div>
+          <div className="preview-body" aria-hidden={isHeroVisible}>
+            <div className="preview-header">
+              <span>
+                Base {baseMetrics.dimensions.width} x {baseMetrics.dimensions.height} in{" "}
+                {canvasSize} x {canvasSize} canvas |{" "}
+                {baseState.mode === "text"
+                  ? `fit ${baseMetrics.fittedFontSize}px`
+                  : baseMetrics.iconName}
+              </span>
+            </div>
 
-          <div className="preview-stage">
-            <div className="preview-main-shell">
-              <div
-                className="preview-canvas"
-                style={{ width: `${canvasSize}px`, height: `${canvasSize}px` }}
-              >
+            <div className="preview-stage">
+              <div className="preview-main-shell">
                 <div
-                  className="preview-zoom-layer"
-                  style={{
-                    transform: previewCompositionTransform,
-                  }}
+                  className="preview-canvas"
+                  style={{ width: `${canvasSize}px`, height: `${canvasSize}px` }}
                 >
-                  {renderCompositeIconStack({
-                    className: "preview-main-stack",
-                    interactive: true,
-                    showCornerHotspots: true,
-                  })}
+                  <div
+                    className="preview-zoom-layer"
+                    style={{
+                      transform: previewCompositionTransform,
+                    }}
+                  >
+                    <CompositeIconStack
+                      baseState={baseState}
+                      particles={particles}
+                      editorTarget={editorTarget}
+                      className="preview-main-stack"
+                      interactive={true}
+                      showCornerHotspots={true}
+                      onSelectBase={handleSelectBase}
+                      onSelectParticle={handleSelectParticle}
+                      onCornerAdd={handleCornerAddOrSelect}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          <section className="preview-contexts">
-            <div className="preview-contexts-head">
-              <div className="preview-contexts-title">
-                <h3>{previewContextMode === "message" ? "Message Preview" : "Quick Previews"}</h3>
-                <span>
-                  {previewContextMode === "message"
-                    ? "Messaging Platforms"
-                    : "White, #323338, and black"}
-                </span>
+            <section className="preview-contexts">
+              <div className="preview-contexts-head">
+                <div className="preview-contexts-title">
+                  <h3>{previewContextMode === "message" ? "Message Preview" : "Quick Previews"}</h3>
+                  <span>
+                    {previewContextMode === "message"
+                      ? "Messaging Platforms"
+                      : "White, #323338, and black"}
+                  </span>
+                </div>
+                <div className="preview-context-mode-toggle">
+                  {PREVIEW_CONTEXT_OPTIONS.map((option) => (
+                    <button
+                      type="button"
+                      key={option.id}
+                      className={
+                        previewContextMode === option.id
+                          ? "preview-context-mode-button active"
+                          : "preview-context-mode-button"
+                      }
+                      onClick={() => setPreviewContextMode(option.id)}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div className="preview-context-mode-toggle">
-                {PREVIEW_CONTEXT_OPTIONS.map((option) => (
-                  <button
-                    type="button"
-                    key={option.id}
-                    className={
-                      previewContextMode === option.id
-                        ? "preview-context-mode-button active"
-                        : "preview-context-mode-button"
-                    }
-                    onClick={() => setPreviewContextMode(option.id)}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            </div>
 
-            {previewContextMode === "surfaces" ? (
-              <div className="quick-preview-grid">
-                {QUICK_PREVIEW_SURFACES.map((surface) => (
-                  <div key={surface.id} className={`quick-preview-tile ${surface.className}`}>
-                    <p className="quick-preview-label">{surface.label}</p>
-                    <div className="quick-preview-icon">
-                      <div
-                        className="context-icon-scale"
-                        style={{
-                          transform: `translate(-50%, -50%) scale(${quickPreviewScale})`,
-                        }}
-                      >
-                        {renderContextCompositeStack()}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="message-preview-shell">
-                <div className="message-preview-row">
-                  <div className="message-preview-avatar" aria-hidden="true">
-                    <span className="message-preview-avatar-initial">A</span>
-                  </div>
-
-                  <div className="message-preview-content">
-                    <div className="message-preview-meta">
-                      <span className="message-preview-author">Username</span>
-                      <span className="message-preview-time">5:09 p.m.</span>
-                    </div>
-
-                    <p className="message-preview-line message-preview-line-inline-demo">
-                      Within text
-                      <span className="message-preview-inline-icon">
-                        <span
+              {previewContextMode === "surfaces" ? (
+                <div className="quick-preview-grid">
+                  {QUICK_PREVIEW_SURFACES.map((surface) => (
+                    <div key={surface.id} className={`quick-preview-tile ${surface.className}`}>
+                      <p className="quick-preview-label">{surface.label}</p>
+                      <div className="quick-preview-icon">
+                        <div
                           className="context-icon-scale"
                           style={{
-                            transform: `translate(-50%, -50%) scale(${messageInlineScale})`,
+                            transform: `translate(-50%, -50%) scale(${quickPreviewScale})`,
                           }}
                         >
                           {renderContextCompositeStack()}
-                        </span>
-                      </span>
-                    </p>
-
-                    <div className="message-preview-large-icon">
-                      <span
-                        className="context-icon-scale"
-                        style={{
-                          transform: `translate(-50%, -50%) scale(${messageLargeScale})`,
-                        }}
-                      >
-                        {renderContextCompositeStack()}
-                      </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="message-preview-shell">
+                  <div className="message-preview-row">
+                    <div className="message-preview-avatar" aria-hidden="true">
+                      <span className="message-preview-avatar-initial">A</span>
                     </div>
 
-                    <p className="message-preview-line message-preview-line-spaced">
-                      This message has a reaction
-                    </p>
-                    <div className="message-preview-reactions">
-                      <div className="message-preview-reaction message-preview-reaction-active">
-                        <span className="message-preview-reaction-icon">
+                    <div className="message-preview-content">
+                      <div className="message-preview-meta">
+                        <span className="message-preview-author">Username</span>
+                        <span className="message-preview-time">5:09 p.m.</span>
+                      </div>
+
+                      <p className="message-preview-line message-preview-line-inline-demo">
+                        Within text
+                        <span className="message-preview-inline-icon">
                           <span
                             className="context-icon-scale"
                             style={{
-                              transform: `translate(-50%, -50%) scale(${messageReactionScale})`,
+                              transform: `translate(-50%, -50%) scale(${messageInlineScale})`,
                             }}
                           >
                             {renderContextCompositeStack()}
                           </span>
                         </span>
-                        <span className="message-preview-reaction-count">1</span>
-                      </div>
-                      <div className="message-preview-reaction-add" aria-hidden="true">
-                        <svg
-                          viewBox="0 0 24 24"
-                          width="18"
-                          height="18"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="1.7"
+                      </p>
+
+                      <div className="message-preview-large-icon">
+                        <span
+                          className="context-icon-scale"
+                          style={{
+                            transform: `translate(-50%, -50%) scale(${messageLargeScale})`,
+                          }}
                         >
-                          <circle cx="12" cy="12" r="8" />
-                          <path d="M8.5 13.2c.9 1.1 2.1 1.6 3.5 1.6s2.6-.5 3.5-1.6" />
-                          <circle cx="9.3" cy="10.2" r="1" fill="currentColor" stroke="none" />
-                          <circle cx="14.7" cy="10.2" r="1" fill="currentColor" stroke="none" />
-                        </svg>
+                          {renderContextCompositeStack()}
+                        </span>
+                      </div>
+
+                      <p className="message-preview-line message-preview-line-spaced">
+                        This message has a reaction
+                      </p>
+                      <div className="message-preview-reactions">
+                        <div className="message-preview-reaction message-preview-reaction-active">
+                          <span className="message-preview-reaction-icon">
+                            <span
+                              className="context-icon-scale"
+                              style={{
+                                transform: `translate(-50%, -50%) scale(${messageReactionScale})`,
+                              }}
+                            >
+                              {renderContextCompositeStack()}
+                            </span>
+                          </span>
+                          <span className="message-preview-reaction-count">1</span>
+                        </div>
+                        <div className="message-preview-reaction-add" aria-hidden="true">
+                          <svg
+                            viewBox="0 0 24 24"
+                            width="18"
+                            height="18"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.7"
+                          >
+                            <circle cx="12" cy="12" r="8" />
+                            <path d="M8.5 13.2c.9 1.1 2.1 1.6 3.5 1.6s2.6-.5 3.5-1.6" />
+                            <circle cx="9.3" cy="10.2" r="1" fill="currentColor" stroke="none" />
+                            <circle cx="14.7" cy="10.2" r="1" fill="currentColor" stroke="none" />
+                          </svg>
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            )}
-          </section>
+              )}
+            </section>
+          </div>
+          <div className="preview-hero" aria-hidden={!isHeroVisible}>
+            <div className="preview-hero-grid" aria-hidden="true" />
+            <div className="preview-hero-samples">
+              {heroSamples.map((sample, index) => {
+                const layout = HERO_SAMPLE_LAYOUT[index];
+                return (
+                  <div
+                    key={sample.id}
+                    className="hero-sample"
+                    style={{
+                      left: layout.left,
+                      top: layout.top,
+                    }}
+                  >
+                    <div
+                      className="hero-sample-card"
+                      style={{
+                        "--hero-rotation": `${layout.rotation}deg`,
+                        "--hero-delay": `${layout.delay}ms`,
+                      }}
+                    >
+                      <StaticCompositionPreview
+                        baseState={sample.state}
+                        particles={sample.particles}
+                        targetSize={layout.size}
+                        padding={14}
+                        className="hero-sample-icon"
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="preview-hero-center">
+              <StaticCompositionPreview
+                baseState={baseState}
+                particles={particles}
+                editorTarget={editorTarget}
+                targetSize={HERO_PRIMARY_ICON_SIZE}
+                padding={20}
+                className="hero-primary-icon"
+              />
+            </div>
+          </div>
         </main>
       </div>
 
-      <section className="export-share-pane app-export-share-pane" aria-label="Export and sharing controls">
+      <section
+        className="export-share-pane app-export-share-pane"
+        data-hidden={isHeroVisible}
+        aria-label="Export and sharing controls"
+      >
         <div className="export-share-pane-head">
           <h3>Export + share</h3>
-          <span>{EXPORT_CANVAS_SIZE} x {EXPORT_CANVAS_SIZE} output</span>
+          <span>{exportTargetWidth} x {exportTargetHeight} output</span>
         </div>
 
         <label className="export-share-pane-label">
@@ -5112,7 +6866,7 @@ function App() {
               </button>
             ))}
           </div>
-          <small>{exportPixelSize} x {exportPixelSize}</small>
+          <small>{exportSizeSummary}</small>
         </label>
 
         <div className="export-pane-secondary-row">
@@ -5139,61 +6893,9 @@ function App() {
         </button>
       </section>
 
-      <div className="export-capture-buffer" aria-hidden="true">
-        <div
-          ref={exportRef}
-          className="export-target"
-          style={{
-            width: `${EXPORT_CANVAS_SIZE}px`,
-            height: `${EXPORT_CANVAS_SIZE}px`,
-          }}
-        >
-          <div
-            className="export-target-inner"
-            style={{ transform: exportCompositionTransform }}
-          >
-            {renderCompositeIconStack()}
-          </div>
-        </div>
-      </div>
+      {exportCaptureBuffer}
 
-      <Modal
-        open={isInfoOpen}
-        title="About Iquan Icon Builder"
-        onClose={() => setInfoOpen(false)}
-        actions={
-          <button type="button" className="btn-secondary" onClick={() => setInfoOpen(false)}>
-            Seems Cool
-          </button>
-        }
-      >
-        <div className="about-modal-content">
-          <p className="about-modal-copy">
-            Iquan was developed for the Codex Creator Challenge by Owen Whelan. It's a free
-            software online that you can use to make little icons and emojis without having to
-            break out a whole image editor. It's great for text editors, messaging platforms, and
-            stickers in notebook apps.
-          </p>
-          <div className="about-modal-links">
-            <a
-              className="about-modal-link about-modal-link-primary"
-              href="https://www.owenwhelan.com"
-              target="_blank"
-              rel="noreferrer"
-            >
-              About Me
-            </a>
-            <a
-              className="about-modal-link about-modal-link-secondary"
-              href="https://github.com/RockhopperHD/iquan"
-              target="_blank"
-              rel="noreferrer"
-            >
-              GitHub Repo
-            </a>
-          </div>
-        </div>
-      </Modal>
+      {aboutModal}
 
       <Modal
         open={isShareOpen}
@@ -5220,19 +6922,16 @@ function App() {
             <button type="button" className="btn-secondary" onClick={handlePasteCode}>
               Paste from clipboard
             </button>
-            <button type="button" className="btn-secondary" onClick={handleLoadIquanLogo}>
-              Use iquan logo
-            </button>
             <button type="button" className="btn-primary" onClick={handleLoadCode}>
               Apply code
             </button>
           </>
         }
       >
-        <p className="helper">
+        <p className="about-modal-copy import-export-modal-copy">
           Share uses the current code. Paste another code or URL below, then apply it.{" "}
-          {hasEmbeddedImagePayload
-            ? "Copy link is URL-safe and does not embed image pixels; use Copy code for full fidelity."
+          {hasImageBackedShare
+            ? "Copy link is only available for text and icon compositions right now. Use Copy code for full fidelity."
             : ""}
         </p>
         <textarea

@@ -125,6 +125,7 @@ describe("share codec", () => {
 
     expect(missing.status).toBe("missing");
     expect(missing.shareCode).toBe(fallbackCode);
+    expect(missing.pageMode).toBe("editor");
     expect(blank.status).toBe("missing");
     expect(blank.shareCode).toBe(fallbackCode);
     expect(invalid.status).toBe("invalid");
@@ -143,6 +144,8 @@ describe("share codec", () => {
     expect(next.shareCode).toBe(code);
     expect(next.decoded.canvasSize).toBe(500);
     expect(next.decoded.base.content).toBe(DEFAULT_STATE.content);
+    expect(next.pageMode).toBe("editor");
+    expect(next.missingSharedImages).toBe(false);
   });
 
   it("creates canonical share links and strips legacy /code path + unnamed query keys", () => {
@@ -161,6 +164,62 @@ describe("share codec", () => {
       basePath: "/iquan",
     });
     expect(normalized).toBe(`https://example.com/iquan/?code=${encodeURIComponent(code)}`);
+  });
+
+  it("creates copied-link share links for the shared landing page", () => {
+    const code = encodeState(DEFAULT_STATE, {}, 500, { urlSafe: true });
+    const normalized = createShareUrl(code, {
+      currentUrl: "https://example.com/?code=IC10%7Clegacy",
+      destination: "copiedLink",
+    });
+    expect(normalized).toBe(`https://example.com/copied-link?code=${encodeURIComponent(code)}`);
+  });
+
+  it("creates copied-link share links for subpath deployments", () => {
+    const code = encodeState(DEFAULT_STATE, {}, 500, { urlSafe: true });
+    const normalized = createShareUrl(code, {
+      currentUrl: "https://example.com/iquan/?code=IC10%7Clegacy",
+      basePath: "/iquan",
+      destination: "copiedLink",
+    });
+    expect(normalized).toBe(`https://example.com/iquan/copied-link?code=${encodeURIComponent(code)}`);
+  });
+
+  it("extracts share code from copied-link URLs", () => {
+    const code = encodeState(DEFAULT_STATE, {}, 500, { urlSafe: true });
+    const url = new URL(`https://example.com/copied-link?code=${encodeURIComponent(code)}`);
+    expect(extractShareCodeFromUrl(url)).toBe(code);
+  });
+
+  it("resolves copied-link route hydration from pathname", () => {
+    const code = encodeState(DEFAULT_STATE, {}, 500, { urlSafe: true });
+    const next = resolveUrlHydration(
+      new URL(`https://example.com/copied-link?code=${encodeURIComponent(code)}`),
+      "IC10|fallback",
+    );
+
+    expect(next.status).toBe("valid");
+    expect(next.pageMode).toBe("copiedLink");
+  });
+
+  it("flags copied-link hydrations that are missing uploaded image assets", () => {
+    const base = sanitizeIconState({
+      ...DEFAULT_STATE,
+      mode: "image",
+      imageData: "data:image/png;base64,CONTENT_IMAGE",
+    });
+
+    const code = encodeState(base, {}, 500, { urlSafe: true });
+    const next = resolveUrlHydration(
+      new URL(`https://example.com/copied-link?code=${encodeURIComponent(code)}`),
+      "IC10|fallback",
+    );
+
+    expect(next.status).toBe("valid");
+    expect(next.pageMode).toBe("copiedLink");
+    expect(next.missingSharedImages).toBe(true);
+    expect(next.decoded.base.mode).toBe("image");
+    expect(next.decoded.base.imageData).toBe("");
   });
 
   it("decodes IC9 payloads for backward compatibility", () => {
