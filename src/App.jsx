@@ -30,6 +30,7 @@ const MAX_GRADIENT_STOPS = 2;
 const MAX_BACK_DISTANCE = 32;
 const ICON_CODE_VERSION = "IC6";
 const SHARE_CODE_VERSION = "IC11";
+const PROJECT_FILE_VERSION = "IQP1";
 const PARTICLE_OFFSET_LIMIT = 120;
 const PARTICLE_EDIT_ZOOM = 1.65;
 const DEFAULT_CANVAS_SIZE = 500;
@@ -51,7 +52,12 @@ const DEFAULT_EXPORT_SCALE = 1;
 const CANVAS_SIZE_PRESETS = [400, 500, 640];
 const DEFAULT_PREVIEW_CONTEXT_MODE = "surfaces";
 const HERO_DESCRIPTION =
-  "Build polished icons fast with live previews, shareable links, and export-ready PNGs.";
+  "Make tiny polished icons for chats, docs, and lightweight UI work without opening a full design tool.";
+const HERO_PROOF_POINTS = [
+  "Start from text, Lucide icons, or uploaded images.",
+  "Preview against real message and surface contexts.",
+  "Export PNGs or save full-fidelity project files.",
+];
 const LANDING_TO_BUILDER_MS = 1100;
 const HERO_SAMPLE_SWAP_MS = 3000;
 const HERO_SAMPLE_SWAP_DELAY_MS = 1200;
@@ -213,10 +219,10 @@ const FONT_WEIGHT_STOPS = [300, 400, 500, 600, 700, 800, 900, 1000];
 const LUCIDE_WEIGHT_STOPS = [0.8, 1.2, 1.6, 2.0, 2.4, 2.8, 3.2, 3.6, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0];
 const ADVANCED_HELP = {
   linkTextToSize:
-    "Keeps a fixed requested text size tied to the base icon. Turn this off to let Icon size in base drive text sizing.",
+    "Keeps a fixed requested text size tied to the active base. Turn this off to let content sizing drive text sizing.",
   fontWeight: "Adjusts the thickness of text characters in text mode.",
   lucideWeight: "Adjusts icon stroke thickness in icon mode.",
-  iconScale: "Scales the letter or icon within the base shape (100% matches the base size).",
+  iconScale: "Scales the active content within the base shape (100% matches the current base size).",
   baseSize:
     "Sets the size of the active icon base. When editing a particle, this changes that particle's base size.",
   letterSpacing: "Adds horizontal spacing between text characters.",
@@ -775,6 +781,76 @@ const HERO_SAMPLE_BLUEPRINTS = [
     },
   },
 ];
+
+const STARTER_TEMPLATES = [
+  {
+    id: "ok-reply",
+    title: "OK Reply",
+    description: "A clear affirmative reaction for texts and quick replies.",
+    canvasSize: 500,
+    base: {
+      mode: "text",
+      content: "OK",
+      shape: "pill",
+      size: 172,
+      pillWidthScale: 198,
+      pillHeightScale: 76,
+      fontSize: 62,
+      fontWeight: "900",
+      fillStops: ["#ecfeff", "#a5f3fc"],
+      strokeStops: ["#0891b2"],
+      textColor: "#0e7490",
+      outline: 5,
+      backColor: "#67e8f9",
+      backDistance: 8,
+      backAngle: 24,
+    },
+  },
+  {
+    id: "x-reply",
+    title: "X Reply",
+    description: "A simple no / cancel reaction that reads at tiny sizes.",
+    canvasSize: 500,
+    base: {
+      mode: "text",
+      content: "X",
+      shape: "circle",
+      size: 168,
+      iconScale: 82,
+      fontSize: 82,
+      fontWeight: "900",
+      fillStops: ["#fff1f2", "#fecdd3"],
+      strokeStops: ["#fb7185"],
+      textColor: "#e11d48",
+      outline: 6,
+      backColor: "#fda4af",
+      backDistance: 10,
+      backAngle: 32,
+    },
+  },
+  {
+    id: "smile-reaction",
+    title: "Smile",
+    description: "A friendly smiley for warm reactions and group chats.",
+    canvasSize: 500,
+    base: {
+      mode: "icon",
+      lucide: "smile",
+      lucideWeight: 2.2,
+      shape: "circle",
+      size: 168,
+      iconScale: 60,
+      fillStops: ["#fff7ed", "#fed7aa"],
+      strokeStops: ["#f59e0b"],
+      textColor: "#b45309",
+      outline: 6,
+      backColor: "#fde68a",
+      backDistance: 10,
+      backAngle: 32,
+    },
+  },
+];
+
 const COMPACT_ICON_FIELDS = [
   ["mode", "m"],
   ["contentEnabled", "me"],
@@ -2381,6 +2457,97 @@ function decodeState(code) {
   return { version, base, particles: {}, canvasSize: DEFAULT_CANVAS_SIZE };
 }
 
+function sanitizeParticlesMap(particles, base) {
+  const safeParticles = {};
+  for (const corner of PARTICLE_CORNERS) {
+    if (!particles?.[corner.key]) continue;
+    safeParticles[corner.key] = sanitizeParticle(particles[corner.key], base);
+  }
+  return safeParticles;
+}
+
+function createProjectPayload(base, particles, canvasSize, options = {}) {
+  const safeBase = sanitizeIconState(base);
+  const safeCanvasSize = clamp(
+    parseIntOr(canvasSize, DEFAULT_CANVAS_SIZE),
+    CANVAS_SIZE_MIN,
+    CANVAS_SIZE_MAX,
+  );
+  const metadata = {
+    title: String(options.title || "Untitled Iquan icon").slice(0, 80),
+  };
+  if (options.createdAt) metadata.createdAt = options.createdAt;
+
+  return {
+    version: PROJECT_FILE_VERSION,
+    app: "iquan",
+    metadata,
+    canvasSize: safeCanvasSize,
+    base: safeBase,
+    particles: sanitizeParticlesMap(particles, safeBase),
+  };
+}
+
+function encodeProjectPayload(base, particles, canvasSize, options = {}) {
+  return JSON.stringify(createProjectPayload(base, particles, canvasSize, options), null, 2);
+}
+
+function decodeProjectPayload(input) {
+  const parsed = typeof input === "string" ? JSON.parse(input) : input;
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("Project file is empty.");
+  }
+  if (parsed.version !== PROJECT_FILE_VERSION || parsed.app !== "iquan") {
+    throw new Error("Unsupported Iquan project file.");
+  }
+
+  const base = sanitizeIconState(parsed.base);
+  const canvasSize = clamp(
+    parseIntOr(parsed.canvasSize, DEFAULT_CANVAS_SIZE),
+    CANVAS_SIZE_MIN,
+    CANVAS_SIZE_MAX,
+  );
+
+  return {
+    version: parsed.version,
+    metadata: parsed.metadata || {},
+    base,
+    particles: sanitizeParticlesMap(parsed.particles, base),
+    canvasSize,
+  };
+}
+
+function decodeProjectOrShareInput(input) {
+  const trimmed = String(input || "").trim();
+  if (!trimmed) throw new Error("Code is empty.");
+  if (trimmed.startsWith("{")) return decodeProjectPayload(trimmed);
+
+  const resolvedCode = resolveShareCodeInput(trimmed);
+  return decodeState(resolvedCode);
+}
+
+const IQUAN_LOGO_CODE = encodeState(
+  sanitizeIconState({
+    ...DEFAULT_STATE,
+    mode: "text",
+    content: "iq",
+    shape: "square",
+    size: 172,
+    radius: 34,
+    fontSize: 58,
+    fontWeight: "900",
+    fillStops: ["#f8fafc", "#dbeafe"],
+    strokeStops: ["#111827"],
+    textColor: "#111827",
+    outline: 7,
+    backColor: "#94a3b8",
+    backDistance: 10,
+    backAngle: 35,
+  }),
+  {},
+  DEFAULT_CANVAS_SIZE,
+);
+
 function getCompositeBounds(baseMetrics, particleLayers) {
   let minX = Math.min(0, baseMetrics.offset.x);
   let minY = Math.min(0, baseMetrics.offset.y);
@@ -3568,32 +3735,6 @@ function ContentSectionHeaderPreview({ state }) {
   );
 }
 
-function ColorSectionHeaderPreview({ state }) {
-  const fillPaint = getGradientPaint(
-    state.fillStops,
-    state.fillGradientType,
-    state.fillGradientAngle,
-    state.fillGradientCenterX,
-    state.fillGradientCenterY,
-  );
-  const strokePaint = getGradientPaint(
-    state.strokeStops,
-    state.strokeGradientType,
-    state.strokeGradientAngle,
-    state.strokeGradientCenterX,
-    state.strokeGradientCenterY,
-  );
-
-  return (
-    <span className="section-header-preview section-header-preview-colors" aria-hidden="true">
-      <span className="section-header-preview-swatch" style={{ background: fillPaint }} />
-      <span className="section-header-preview-swatch" style={{ background: state.textColor }} />
-      <span className="section-header-preview-swatch" style={{ background: strokePaint }} />
-      <span className="section-header-preview-swatch" style={{ background: state.backColor }} />
-    </span>
-  );
-}
-
 function BackLayerSectionHeaderPreview({ state }) {
   const offset = getOffset(Math.max(8, state.backDistance), state.backAngle);
   const backX = Number((offset.x * 0.32).toFixed(2));
@@ -4018,6 +4159,35 @@ function StaticCompositionPreview({
         </span>
       </div>
     </div>
+  );
+}
+
+function StarterTemplateButton({ template, onClick }) {
+  const baseState = useMemo(
+    () => sanitizeIconState({ ...DEFAULT_STATE, ...template.base }),
+    [template],
+  );
+  const particles = useMemo(
+    () => sanitizeParticlesMap(template.particles, baseState),
+    [template, baseState],
+  );
+
+  return (
+    <button
+      type="button"
+      className="starter-template-card"
+      onClick={onClick}
+      aria-label={template.title}
+      title={template.title}
+    >
+      <StaticCompositionPreview
+        baseState={baseState}
+        particles={particles}
+        targetSize={72}
+        padding={4}
+        className="starter-template-preview"
+      />
+    </button>
   );
 }
 
@@ -4618,9 +4788,7 @@ function App() {
   const [isFontPickerOpen, setFontPickerOpen] = useState(false);
   const [isContentSectionOpen, setContentSectionOpen] = useState(true);
   const [isShapeSectionOpen, setShapeSectionOpen] = useState(true);
-  const [isColorSectionOpen, setColorSectionOpen] = useState(true);
   const [isBackLayerSectionOpen, setBackLayerSectionOpen] = useState(true);
-  const [isColorSectionEnabled, setColorSectionEnabled] = useState(true);
   const [isContentAdvancedOpen, setContentAdvancedOpen] = useState(false);
   const [isShapeAdvancedOpen, setShapeAdvancedOpen] = useState(false);
   const [isBackDistanceLocked, setBackDistanceLocked] = useState(false);
@@ -4644,6 +4812,7 @@ function App() {
   const controlsRef = useRef(null);
   const contentImageUploadInputRef = useRef(null);
   const shapeImageUploadInputRef = useRef(null);
+  const projectFileInputRef = useRef(null);
   const hasHydratedFromUrlRef = useRef(false);
   const skipNextShareUrlSyncRef = useRef(false);
   const heroTransitionTimerRef = useRef(null);
@@ -4694,6 +4863,8 @@ function App() {
   const isEditingParticle = Boolean(activeParticle);
   const state = isEditingParticle ? activeParticle.icon : baseState;
   const editorStateKey = isEditingParticle ? `particle:${editorTarget.corner}` : "base";
+  const contentSizeLabel = isEditingParticle ? "Content size in particle base" : "Content size in base";
+  const currentBaseLabel = isEditingParticle ? "particle base" : "base";
   const selectedShapeMode = state.shape;
   const isContentSectionEnabled = state.contentEnabled;
   const isShapeSectionEnabled = state.shapeEnabled;
@@ -4725,6 +4896,11 @@ function App() {
     () => encodeState(baseState, particles, canvasSize),
     [baseState, particles, canvasSize],
   );
+  const defaultShareCode = useMemo(
+    () => encodeState(DEFAULT_STATE, {}, DEFAULT_CANVAS_SIZE),
+    [],
+  );
+  const isDefaultComposition = fullShareCode === defaultShareCode;
   const urlSafeShareCode = useMemo(
     () => encodeState(baseState, particles, canvasSize, { urlSafe: true }),
     [baseState, particles, canvasSize],
@@ -5060,6 +5236,12 @@ function App() {
       window.clearTimeout(heroTransitionTimerRef.current);
       heroTransitionTimerRef.current = null;
     }
+    if (controlsRef.current) {
+      controlsRef.current.scrollTop = 0;
+      controlsRef.current.scrollLeft = 0;
+    }
+    setEditorTarget({ type: "base" });
+    setPreviewContextMode(DEFAULT_PREVIEW_CONTEXT_MODE);
     setInfoOpen(false);
     setShareOpen(false);
     setIconPickerOpen(false);
@@ -5233,16 +5415,23 @@ function App() {
     }
   };
 
+  const applyDecodedComposition = (next, options = {}) => {
+    setBaseState(next.base);
+    setParticles(next.particles);
+    setCanvasSize(next.canvasSize);
+    setEditorTarget({ type: "base" });
+    setLoadCode(options.loadCode ?? encodeState(next.base, next.particles, next.canvasSize));
+    setShareOpen(false);
+    setToast(options.toast || "Project loaded");
+  };
+
   const handleLoadIquanLogo = () => {
     try {
       const next = decodeState(IQUAN_LOGO_CODE);
-      setBaseState(next.base);
-      setParticles(next.particles);
-      setCanvasSize(next.canvasSize);
-      setEditorTarget({ type: "base" });
-      setLoadCode(IQUAN_LOGO_CODE);
-      setShareOpen(false);
-      setToast("Loaded iquan logo");
+      applyDecodedComposition(next, {
+        loadCode: IQUAN_LOGO_CODE,
+        toast: "Loaded iquan logo",
+      });
     } catch {
       setToast("Could not load iquan logo");
     }
@@ -5250,17 +5439,61 @@ function App() {
 
   const handleLoadCode = () => {
     try {
-      const resolvedCode = resolveShareCodeInput(loadCode);
-      const next = decodeState(resolvedCode);
-      setBaseState(next.base);
-      setParticles(next.particles);
-      setCanvasSize(next.canvasSize);
-      setEditorTarget({ type: "base" });
-      setLoadCode(resolvedCode);
-      setShareOpen(false);
-      setToast("Code loaded");
+      const trimmed = loadCode.trim();
+      const isProjectFile = trimmed.startsWith("{");
+      const next = decodeProjectOrShareInput(trimmed);
+      applyDecodedComposition(next, {
+        loadCode: isProjectFile ? encodeState(next.base, next.particles, next.canvasSize) : resolveShareCodeInput(trimmed),
+        toast: isProjectFile ? "Project loaded" : "Code loaded",
+      });
     } catch (error) {
       setToast(error.message || "Invalid code");
+    }
+  };
+
+  const handleExportProject = () => {
+    const title =
+      baseState.mode === "text"
+        ? `${baseState.content || "Icon"} icon`
+        : baseState.mode === "image"
+          ? `${sanitizeFilename(baseState.imageName || "image")} icon`
+          : `${baseMetrics.iconName || "Iquan"} icon`;
+    const fileBase = sanitizeFilename(title)
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "") || "iquan-project";
+    const json = encodeProjectPayload(baseState, particles, canvasSize, {
+      title,
+      createdAt: new Date().toISOString(),
+    });
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${fileBase}.iquan.json`;
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+    setToast("Iquan project file exported");
+  };
+
+  const handleImportProjectClick = () => {
+    projectFileInputRef.current?.click();
+  };
+
+  const handleProjectFileChange = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const next = decodeProjectPayload(text);
+      applyDecodedComposition(next, {
+        loadCode: encodeState(next.base, next.particles, next.canvasSize),
+        toast: "Project file imported",
+      });
+    } catch (error) {
+      setToast(error.message || "Project import failed");
     }
   };
 
@@ -5558,12 +5791,21 @@ function App() {
     setShapeAdvancedOpen(false);
     setBackDistanceLocked(false);
     setBackAngleLocked(false);
-    setColorSectionEnabled(true);
     setExportScale(DEFAULT_EXPORT_SCALE);
     setPreviewContextMode(DEFAULT_PREVIEW_CONTEXT_MODE);
     setCursorTooltip(null);
     setImageCropState(createDefaultImageCropState());
     setToast("Everything reset");
+  };
+
+  const handleApplyStarterTemplate = (template) => {
+    const nextBase = sanitizeIconState({ ...DEFAULT_STATE, ...template.base });
+    setBaseState(nextBase);
+    setParticles(sanitizeParticlesMap(template.particles, nextBase));
+    setCanvasSize(template.canvasSize || DEFAULT_CANVAS_SIZE);
+    setEditorTarget({ type: "base" });
+    setUiPhase("builder");
+    setToast(`${template.title} template loaded`);
   };
 
   const quickPreviewSize = 60;
@@ -5674,10 +5916,10 @@ function App() {
     >
       <div className="about-modal-content">
         <p className="about-modal-copy">
-          Iquan was developed for the Codex Creator Challenge by Owen Whelan. It's a free
-          software online that you can use to make little icons and emojis without having to
-          break out a whole image editor. It's great for text editors, messaging platforms, and
-          stickers in notebook apps.
+          Iquan is a fast icon builder for the tiny visual assets that show up everywhere:
+          chat reactions, doc stickers, status badges, and lightweight UI icons. It was built
+          for the Codex Creator Challenge by Owen Whelan to make polished icon work feel quick
+          instead of heavyweight.
         </p>
         <div className="about-modal-links">
           <a
@@ -6158,10 +6400,34 @@ function App() {
                 </>
               )}
 
+              <label>
+                Content transparency
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  step={1}
+                  value={state.contentOpacity}
+                  onChange={(event) =>
+                    patchState({ contentOpacity: Number(event.target.value) })
+                  }
+                />
+                <small>{state.contentOpacity}%</small>
+              </label>
+
+              <label className="color-dot-control">
+                <span>Content</span>
+                <input
+                  type="color"
+                  value={state.textColor}
+                  onChange={(event) => handleColorChange("textColor", event.target.value)}
+                />
+              </label>
+
               {state.mode !== "none" ? (
                 <label>
                   <span className="label-head">
-                    Icon size in base
+                    {contentSizeLabel}
                     <HelpHint text={ADVANCED_HELP.iconScale} setTooltip={setCursorTooltip} />
                   </span>
                   <input
@@ -6196,12 +6462,12 @@ function App() {
                     </button>
                   </div>
                   <small>
-                    {state.iconScale}% of the base
+                    {state.iconScale}% of the {currentBaseLabel}
                   </small>
                   {isTextScaleCappedByLink ? (
                     <small className="status warn">
-                      Text size is capped by linked base sizing. Open Advanced and turn off Link text
-                      size to base size.
+                      Text size is capped by linked {currentBaseLabel} sizing. Open Advanced and
+                      turn off Link text size to base size.
                     </small>
                   ) : null}
                 </label>
@@ -6245,7 +6511,10 @@ function App() {
                           <HelpHint text={ADVANCED_HELP.linkTextToSize} setTooltip={setCursorTooltip} />
                         </span>
                       </label>
-                      <small>Turn this off to let Icon size in base control text size directly.</small>
+                      <small>
+                        Turn this off to let {contentSizeLabel.toLowerCase()} control text size
+                        directly.
+                      </small>
 
                       <label>
                         <span className="label-head">
@@ -6270,7 +6539,7 @@ function App() {
         </SectionPanel>
 
         <SectionPanel
-          title="Shape"
+          title="Base"
           isOpen={isShapeSectionOpen}
           onToggleOpen={() => setShapeSectionOpen((open) => !open)}
           isEnabled={isShapeSectionEnabled}
@@ -6331,6 +6600,68 @@ function App() {
                         </button>
                       ))}
                     </div>
+                  </label>
+
+                  <label>
+                    Base transparency
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      step={1}
+                      value={state.baseOpacity}
+                      onChange={(event) => patchState({ baseOpacity: Number(event.target.value) })}
+                    />
+                    <small>{state.baseOpacity}%</small>
+                  </label>
+
+                  <div className="gradient-control-pair">
+                    <GradientColorControl
+                      label="Fill"
+                      stops={state.fillStops}
+                      gradientType={state.fillGradientType}
+                      angle={state.fillGradientAngle}
+                      centerX={state.fillGradientCenterX}
+                      centerY={state.fillGradientCenterY}
+                      onStopChange={(index, value) => handleGradientStopChange("fillStops", index, value)}
+                      onAddStop={() => handleGradientStopAdd("fillStops")}
+                      onRemoveStop={(index) => handleGradientStopRemove("fillStops", index)}
+                      onGradientTypeChange={(type) => patchState({ fillGradientType: type })}
+                      onAngleChange={(nextAngle) => patchState({ fillGradientAngle: nextAngle })}
+                      onCenterChange={(x, y) =>
+                        patchState({ fillGradientCenterX: x, fillGradientCenterY: y })
+                      }
+                    />
+
+                    <GradientColorControl
+                      label="Stroke"
+                      stops={state.strokeStops}
+                      gradientType={state.strokeGradientType}
+                      angle={state.strokeGradientAngle}
+                      centerX={state.strokeGradientCenterX}
+                      centerY={state.strokeGradientCenterY}
+                      onStopChange={(index, value) => handleGradientStopChange("strokeStops", index, value)}
+                      onAddStop={() => handleGradientStopAdd("strokeStops")}
+                      onRemoveStop={(index) => handleGradientStopRemove("strokeStops", index)}
+                      onGradientTypeChange={(type) => patchState({ strokeGradientType: type })}
+                      onAngleChange={(nextAngle) => patchState({ strokeGradientAngle: nextAngle })}
+                      onCenterChange={(x, y) =>
+                        patchState({ strokeGradientCenterX: x, strokeGradientCenterY: y })
+                      }
+                    />
+                  </div>
+
+                  <label>
+                    Stroke width
+                    <input
+                      type="range"
+                      min={0}
+                      max={24}
+                      step={1}
+                      value={state.outline}
+                      onChange={(event) => patchState({ outline: Number(event.target.value) })}
+                    />
+                    <small>{state.outline}px</small>
                   </label>
 
                   <label>
@@ -6405,6 +6736,68 @@ function App() {
                   />
 
                   <label>
+                    Base transparency
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      step={1}
+                      value={state.baseOpacity}
+                      onChange={(event) => patchState({ baseOpacity: Number(event.target.value) })}
+                    />
+                    <small>{state.baseOpacity}%</small>
+                  </label>
+
+                  <div className="gradient-control-pair">
+                    <GradientColorControl
+                      label="Fill"
+                      stops={state.fillStops}
+                      gradientType={state.fillGradientType}
+                      angle={state.fillGradientAngle}
+                      centerX={state.fillGradientCenterX}
+                      centerY={state.fillGradientCenterY}
+                      onStopChange={(index, value) => handleGradientStopChange("fillStops", index, value)}
+                      onAddStop={() => handleGradientStopAdd("fillStops")}
+                      onRemoveStop={(index) => handleGradientStopRemove("fillStops", index)}
+                      onGradientTypeChange={(type) => patchState({ fillGradientType: type })}
+                      onAngleChange={(nextAngle) => patchState({ fillGradientAngle: nextAngle })}
+                      onCenterChange={(x, y) =>
+                        patchState({ fillGradientCenterX: x, fillGradientCenterY: y })
+                      }
+                    />
+
+                    <GradientColorControl
+                      label="Stroke"
+                      stops={state.strokeStops}
+                      gradientType={state.strokeGradientType}
+                      angle={state.strokeGradientAngle}
+                      centerX={state.strokeGradientCenterX}
+                      centerY={state.strokeGradientCenterY}
+                      onStopChange={(index, value) => handleGradientStopChange("strokeStops", index, value)}
+                      onAddStop={() => handleGradientStopAdd("strokeStops")}
+                      onRemoveStop={(index) => handleGradientStopRemove("strokeStops", index)}
+                      onGradientTypeChange={(type) => patchState({ strokeGradientType: type })}
+                      onAngleChange={(nextAngle) => patchState({ strokeGradientAngle: nextAngle })}
+                      onCenterChange={(x, y) =>
+                        patchState({ strokeGradientCenterX: x, strokeGradientCenterY: y })
+                      }
+                    />
+                  </div>
+
+                  <label>
+                    Stroke width
+                    <input
+                      type="range"
+                      min={0}
+                      max={24}
+                      step={1}
+                      value={state.outline}
+                      onChange={(event) => patchState({ outline: Number(event.target.value) })}
+                    />
+                    <small>{state.outline}px</small>
+                  </label>
+
+                  <label>
                     Corner radius
                     <input
                       type="range"
@@ -6465,110 +6858,7 @@ function App() {
         </SectionPanel>
 
         <SectionPanel
-          title="Color"
-          isOpen={isColorSectionOpen}
-          onToggleOpen={() => setColorSectionOpen((open) => !open)}
-          isEnabled={isColorSectionEnabled}
-          onToggleEnabled={setColorSectionEnabled}
-          headerPreview={<ColorSectionHeaderPreview state={state} />}
-        >
-          <>
-              <div className="color-controls-grid">
-                <GradientColorControl
-                  label="Fill"
-                  stops={state.fillStops}
-                  gradientType={state.fillGradientType}
-                  angle={state.fillGradientAngle}
-                  centerX={state.fillGradientCenterX}
-                  centerY={state.fillGradientCenterY}
-                  onStopChange={(index, value) => handleGradientStopChange("fillStops", index, value)}
-                  onAddStop={() => handleGradientStopAdd("fillStops")}
-                  onRemoveStop={(index) => handleGradientStopRemove("fillStops", index)}
-                  onGradientTypeChange={(type) => patchState({ fillGradientType: type })}
-                  onAngleChange={(nextAngle) => patchState({ fillGradientAngle: nextAngle })}
-                  onCenterChange={(x, y) =>
-                    patchState({ fillGradientCenterX: x, fillGradientCenterY: y })
-                  }
-                />
-                <label className="color-dot-control">
-                  <span>Content</span>
-                  <input
-                    type="color"
-                    value={state.textColor}
-                    onChange={(event) => handleColorChange("textColor", event.target.value)}
-                  />
-                </label>
-                <GradientColorControl
-                  label="Stroke"
-                  stops={state.strokeStops}
-                  gradientType={state.strokeGradientType}
-                  angle={state.strokeGradientAngle}
-                  centerX={state.strokeGradientCenterX}
-                  centerY={state.strokeGradientCenterY}
-                  onStopChange={(index, value) => handleGradientStopChange("strokeStops", index, value)}
-                  onAddStop={() => handleGradientStopAdd("strokeStops")}
-                  onRemoveStop={(index) => handleGradientStopRemove("strokeStops", index)}
-                  onGradientTypeChange={(type) => patchState({ strokeGradientType: type })}
-                  onAngleChange={(nextAngle) => patchState({ strokeGradientAngle: nextAngle })}
-                  onCenterChange={(x, y) =>
-                    patchState({ strokeGradientCenterX: x, strokeGradientCenterY: y })
-                  }
-                />
-                <label className="color-dot-control">
-                  <span>Back</span>
-                  <input
-                    type="color"
-                    value={state.backColor}
-                    onChange={(event) => handleColorChange("backColor", event.target.value)}
-                  />
-                </label>
-              </div>
-
-              <label>
-                Stroke width
-                <input
-                  type="range"
-                  min={0}
-                  max={24}
-                  step={1}
-                  value={state.outline}
-                  onChange={(event) => patchState({ outline: Number(event.target.value) })}
-                />
-                <small>{state.outline}px</small>
-              </label>
-
-              <label>
-                Base transparency
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  step={1}
-                  value={state.baseOpacity}
-                  onChange={(event) => patchState({ baseOpacity: Number(event.target.value) })}
-                />
-                <small>{state.baseOpacity}%</small>
-              </label>
-
-              <label>
-                Content transparency
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  step={1}
-                  value={state.contentOpacity}
-                  onChange={(event) =>
-                    patchState({ contentOpacity: Number(event.target.value) })
-                  }
-                />
-                <small>{state.contentOpacity}%</small>
-              </label>
-          </>
-        </SectionPanel>
-
-        <SectionPanel
-          title="Back layer wheel"
+          title="Back"
           isOpen={isBackLayerSectionOpen}
           onToggleOpen={() => setBackLayerSectionOpen((open) => !open)}
           isEnabled={isBackLayerSectionEnabled}
@@ -6593,6 +6883,15 @@ function App() {
               >
                 Reset back layer
               </button>
+
+              <label className="color-dot-control">
+                <span>Back</span>
+                <input
+                  type="color"
+                  value={state.backColor}
+                  onChange={(event) => handleColorChange("backColor", event.target.value)}
+                />
+              </label>
           </>
         </SectionPanel>
 
@@ -6600,11 +6899,28 @@ function App() {
           <div className="controls-hero" aria-hidden={!isHeroVisible}>
             <div className="controls-hero-content">
               <p className="controls-hero-eyebrow">Iquan</p>
-              <h1>Need a quick icon? Iquan it</h1>
+              <h1>Tiny icons, ready for real places</h1>
               <p className="controls-hero-copy">{HERO_DESCRIPTION}</p>
-              <button type="button" className="btn-primary controls-hero-cta" onClick={handleStartBuilder}>
-                Get Started
-              </button>
+              <ul className="controls-hero-points">
+                {HERO_PROOF_POINTS.map((point) => (
+                  <li key={point}>{point}</li>
+                ))}
+              </ul>
+              <div className="controls-hero-actions">
+                <button type="button" className="btn-primary controls-hero-cta" onClick={handleStartBuilder}>
+                  {isDefaultComposition ? "Start from scratch" : "Continue From Here"}
+                </button>
+              </div>
+              <p className="starter-template-label">...or use a preset:</p>
+              <div className="starter-template-grid" aria-label="Starter templates">
+                {STARTER_TEMPLATES.map((template) => (
+                  <StarterTemplateButton
+                    key={template.id}
+                    template={template}
+                    onClick={() => handleApplyStarterTemplate(template)}
+                  />
+                ))}
+              </div>
             </div>
           </div>
         </aside>
@@ -6895,6 +7211,14 @@ function App() {
 
       {exportCaptureBuffer}
 
+      <input
+        ref={projectFileInputRef}
+        type="file"
+        accept=".iquan.json,application/json"
+        className="visually-hidden-file"
+        onChange={handleProjectFileChange}
+      />
+
       {aboutModal}
 
       <Modal
@@ -6906,21 +7230,9 @@ function App() {
             <button
               type="button"
               className="btn-secondary"
-              onClick={handleCopyShareLink}
+              onClick={() => setShareOpen(false)}
             >
-              Copy link
-            </button>
-            <button
-              type="button"
-              className="btn-secondary"
-              onClick={() =>
-                copyToClipboard(fullShareCode, "Share code copied (full fidelity)")
-              }
-            >
-              Copy code
-            </button>
-            <button type="button" className="btn-secondary" onClick={handlePasteCode}>
-              Paste from clipboard
+              Close
             </button>
             <button type="button" className="btn-primary" onClick={handleLoadCode}>
               Apply code
@@ -6929,16 +7241,68 @@ function App() {
         }
       >
         <p className="about-modal-copy import-export-modal-copy">
-          Share uses the current code. Paste another code or URL below, then apply it.{" "}
+          Share links are best for text and icon work. Project files preserve everything,
+          including uploaded images. Paste an IC code, URL, or .iquan JSON below, then apply it.{" "}
           {hasImageBackedShare
-            ? "Copy link is only available for text and icon compositions right now. Use Copy code for full fidelity."
+            ? "This icon uses uploaded images, so export a project file for full fidelity."
             : ""}
         </p>
-        <textarea
-          value={loadCode}
-          onChange={(event) => setLoadCode(event.target.value)}
-          placeholder="Paste IC11|... code or URL"
-        />
+        <div className="import-export-workspace">
+          <label className="import-export-code-field">
+            <span>Import code or project JSON</span>
+            <textarea
+              value={loadCode}
+              onChange={(event) => setLoadCode(event.target.value)}
+              placeholder="Paste IC11|... code, URL, or .iquan JSON"
+            />
+          </label>
+
+          <div className="import-export-group-grid">
+            <section className="import-export-group">
+              <div>
+                <h4>Share</h4>
+                <p>Use these for text and icon compositions.</p>
+              </div>
+              <div className="import-export-group-actions">
+                <button type="button" className="btn-secondary" onClick={handleCopyShareLink}>
+                  Copy link
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() =>
+                    copyToClipboard(fullShareCode, "Share code copied (full fidelity)")
+                  }
+                >
+                  Copy code
+                </button>
+              </div>
+            </section>
+
+            <section className="import-export-group">
+              <div>
+                <h4>Project file</h4>
+                <p>Best for uploaded images or work you want to edit later.</p>
+              </div>
+              <div className="import-export-group-actions">
+                <button type="button" className="btn-secondary" onClick={handleImportProjectClick}>
+                  Import file
+                </button>
+                <button type="button" className="btn-secondary" onClick={handleExportProject}>
+                  Export project
+                </button>
+              </div>
+            </section>
+          </div>
+
+          <button
+            type="button"
+            className="btn-ghost import-export-paste"
+            onClick={handlePasteCode}
+          >
+            Paste from clipboard
+          </button>
+        </div>
       </Modal>
 
       <IconPickerModal
@@ -6991,13 +7355,18 @@ function App() {
 
 export {
   DEFAULT_STATE,
+  PROJECT_FILE_VERSION,
   SHARE_CODE_VERSION,
+  createProjectPayload,
   extractShareCodeFromUrl,
   resolveUrlHydration,
   createShareUrl,
   encodeIconState,
   encodeState,
+  encodeProjectPayload,
   decodeState,
+  decodeProjectPayload,
+  decodeProjectOrShareInput,
   sanitizeIconState,
 };
 

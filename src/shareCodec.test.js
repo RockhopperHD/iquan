@@ -1,10 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_STATE,
+  PROJECT_FILE_VERSION,
   SHARE_CODE_VERSION,
   createShareUrl,
+  decodeProjectOrShareInput,
+  decodeProjectPayload,
   decodeState,
   encodeIconState,
+  encodeProjectPayload,
   encodeState,
   extractShareCodeFromUrl,
   resolveUrlHydration,
@@ -283,5 +287,61 @@ describe("share codec", () => {
     expect(sanitized.outlineColor).toBe("#ff8844");
     expect(sanitized.strokeStops[0]).toBe("#ff8844");
     expect(sanitized.strokeStops[1]).toBe("#5a2a00");
+  });
+
+  it("exports and imports full-fidelity project files with uploaded image payloads", () => {
+    const base = sanitizeIconState({
+      ...DEFAULT_STATE,
+      mode: "image",
+      imageData: "data:image/png;base64,CONTENT_IMAGE",
+      imageName: "content.png",
+      imageWidth: 128,
+      imageHeight: 96,
+      shape: "image",
+      baseImageData: "data:image/png;base64,BASE_IMAGE",
+      baseImageName: "base.png",
+      baseImageWidth: 256,
+      baseImageHeight: 256,
+    });
+    const particles = {
+      topRight: {
+        offsetX: 10,
+        offsetY: -12,
+        icon: sanitizeIconState({
+          ...DEFAULT_STATE,
+          mode: "image",
+          imageData: "data:image/png;base64,PARTICLE_IMAGE",
+          imageName: "particle.png",
+          imageWidth: 32,
+          imageHeight: 32,
+        }),
+      },
+    };
+
+    const project = encodeProjectPayload(base, particles, 640, {
+      title: "Image backed icon",
+      createdAt: "2026-04-23T12:00:00.000Z",
+    });
+    const decoded = decodeProjectPayload(project);
+
+    expect(decoded.version).toBe(PROJECT_FILE_VERSION);
+    expect(decoded.canvasSize).toBe(640);
+    expect(decoded.metadata.title).toBe("Image backed icon");
+    expect(decoded.base.imageData).toBe(base.imageData);
+    expect(decoded.base.baseImageData).toBe(base.baseImageData);
+    expect(decoded.particles.topRight.icon.imageData).toBe(
+      "data:image/png;base64,PARTICLE_IMAGE",
+    );
+  });
+
+  it("decodes either project JSON or share-code input from the import modal", () => {
+    const project = encodeProjectPayload(DEFAULT_STATE, {}, 500);
+    const projectDecoded = decodeProjectOrShareInput(project);
+    const code = encodeState(DEFAULT_STATE, {}, 500, { urlSafe: true });
+    const codeDecoded = decodeProjectOrShareInput(code);
+
+    expect(projectDecoded.version).toBe(PROJECT_FILE_VERSION);
+    expect(codeDecoded.version).toBe(SHARE_CODE_VERSION);
+    expect(codeDecoded.base.content).toBe(DEFAULT_STATE.content);
   });
 });
