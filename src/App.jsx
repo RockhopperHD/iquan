@@ -1595,6 +1595,41 @@ function sanitizeFilename(value, fallback = "image") {
   return safe.replace(/\s+/g, " ").slice(0, 120);
 }
 
+function triggerDownloadUrl(url, filename) {
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.rel = "noopener";
+  link.style.display = "none";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
+
+function triggerDownloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  triggerDownloadUrl(url, filename);
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function fallbackCopyToClipboard(value) {
+  const textArea = document.createElement("textarea");
+  textArea.value = value;
+  textArea.setAttribute("readonly", "");
+  textArea.style.position = "fixed";
+  textArea.style.left = "-10000px";
+  textArea.style.top = "0";
+  document.body.appendChild(textArea);
+  textArea.focus();
+  textArea.select();
+
+  try {
+    return document.execCommand("copy");
+  } finally {
+    textArea.remove();
+  }
+}
+
 function clampCropDraft(draft, width, height) {
   const safeWidth = Math.max(1, parseFloatOr(width, 1));
   const safeHeight = Math.max(1, parseFloatOr(height, 1));
@@ -6946,10 +6981,21 @@ function App() {
 
   const copyToClipboard = async (value, successMessage) => {
     try {
-      await navigator.clipboard.writeText(value);
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(value);
+      } else if (!fallbackCopyToClipboard(value)) {
+        throw new Error("Clipboard fallback failed");
+      }
       setToast(successMessage);
     } catch {
-      setToast("Clipboard access blocked");
+      try {
+        if (!fallbackCopyToClipboard(value)) {
+          throw new Error("Clipboard fallback failed");
+        }
+        setToast(successMessage);
+      } catch {
+        setToast("Clipboard access blocked");
+      }
     }
   };
 
@@ -6966,12 +7012,7 @@ function App() {
 
   const handleDownloadIquanSpec = () => {
     const blob = new Blob([iquanSpecMarkdown], { type: "text/markdown;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "IQUAN_SPEC.md";
-    link.click();
-    URL.revokeObjectURL(url);
+    triggerDownloadBlob(blob, "IQUAN_SPEC.md");
     setToast("IQUAN_SPEC.md downloaded");
   };
 
@@ -7007,10 +7048,10 @@ function App() {
                 .replace(/^-|-$/g, "")
             : baseMetrics.iconName;
 
-      const link = document.createElement("a");
-      link.href = dataUrl;
-      link.download = `icon-${namePart || "icon"}-${exportTargetWidth}x${exportTargetHeight}@${exportScale}x.png`;
-      link.click();
+      triggerDownloadUrl(
+        dataUrl,
+        `icon-${namePart || "icon"}-${exportTargetWidth}x${exportTargetHeight}@${exportScale}x.png`,
+      );
       setToast(`PNG exported (${exportPixelWidth} x ${exportPixelHeight})`);
     } catch {
       setToast("Export failed");
@@ -7074,12 +7115,7 @@ function App() {
       createdAt: new Date().toISOString(),
     });
     const blob = new Blob([json], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `${fileBase}.iquan.json`;
-    link.click();
-    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+    triggerDownloadBlob(blob, `${fileBase}.iquan.json`);
     setToast("Iquan project file exported");
   };
 

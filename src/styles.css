@@ -3022,7 +3022,7 @@ button.app-header-title-link:active {
 }
 
 .app-export-share-pane:hover > :not(.export-share-pane-head) {
-  pointer-events: none;
+  pointer-events: auto;
 }
 
 .export-share-pane-head {
@@ -3311,13 +3311,14 @@ button.app-header-title-link:active {
 
 .export-capture-buffer {
   position: fixed;
-  left: -10000px;
-  top: -10000px;
+  left: 0;
+  top: 0;
   pointer-events: none;
-  opacity: 0;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
+  opacity: 1;
+  width: auto;
+  height: auto;
+  overflow: visible;
+  transform: translate(-10000px, -10000px);
 }
 
 .icon-stack {
