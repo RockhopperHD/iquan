@@ -38,6 +38,7 @@ describe("share codec", () => {
       baseImageCropX: 0.11,
       baseImageCropY: 0.04,
       baseImageCropSize: 0.9,
+      contentRotation: -14,
       fillStops: ["#112233", "#445566"],
       strokeStops: ["#99aabb", "#ccddee"],
       strokeGradientType: "radial",
@@ -55,6 +56,7 @@ describe("share codec", () => {
           imageName: "particle-image",
           imageWidth: 64,
           imageHeight: 64,
+          contentRotation: 23,
         }),
       },
     };
@@ -68,9 +70,11 @@ describe("share codec", () => {
     expect(decoded.base.imageData).toBe(base.imageData);
     expect(decoded.base.baseImageData).toBe(base.baseImageData);
     expect(decoded.base.baseImageName).toBe("shape-image");
+    expect(decoded.base.contentRotation).toBe(-14);
     expect(decoded.particles.topRight.icon.imageData).toBe(
       "data:image/png;base64,PARTICLE_IMAGE",
     );
+    expect(decoded.particles.topRight.icon.contentRotation).toBe(23);
   });
 
   it("creates URL-safe share codes without embedded image payloads", () => {
@@ -287,6 +291,41 @@ describe("share codec", () => {
     expect(sanitized.outlineColor).toBe("#ff8844");
     expect(sanitized.strokeStops[0]).toBe("#ff8844");
     expect(sanitized.strokeStops[1]).toBe("#5a2a00");
+  });
+
+  it("round-trips folder base settings through share codes", () => {
+    const base = sanitizeIconState({
+      ...DEFAULT_STATE,
+      shape: "folder",
+      folderTabX: 42,
+      folderTabWidth: 58,
+      folderTabHeight: 28,
+      widthScale: 148,
+      heightScale: 94,
+      radius: 18,
+      fillStops: ["#facc15", "#f97316"],
+      strokeStops: ["#92400e"],
+    });
+
+    const code = encodeState(base, {}, 500);
+    const decoded = decodeState(code);
+
+    expect(decoded.base.shape).toBe("folder");
+    expect(decoded.base.folderTabX).toBe(42);
+    expect(decoded.base.folderTabWidth).toBe(58);
+    expect(decoded.base.folderTabHeight).toBe(28);
+    expect(decoded.base.widthScale).toBe(148);
+    expect(decoded.base.heightScale).toBe(94);
+    expect(decoded.base.radius).toBe(18);
+  });
+
+  it("sanitizes content rotation for text and icon content", () => {
+    expect(sanitizeIconState({ ...DEFAULT_STATE, contentRotation: -220 }).contentRotation).toBe(
+      -180,
+    );
+    expect(
+      sanitizeIconState({ ...DEFAULT_STATE, mode: "icon", contentRotation: 220 }).contentRotation,
+    ).toBe(180);
   });
 
   it("exports and imports full-fidelity project files with uploaded image payloads", () => {

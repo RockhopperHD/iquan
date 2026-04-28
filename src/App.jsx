@@ -1,7 +1,19 @@
-import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useId, useMemo, useRef, useState } from "react";
 import { toPng } from "html-to-image";
-import { Redo2, Trash2, Undo2 } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Clipboard,
+  Download,
+  PenLine,
+  Plus,
+  Redo2,
+  RotateCcw,
+  Trash2,
+  Undo2,
+} from "lucide-react";
 import dynamicIconImports from "lucide-react/dynamicIconImports";
+import iquanSpecMarkdown from "../IQUAN_SPEC.md?raw";
 
 const MODES = ["text", "icon", "image"];
 const MODE_TOGGLE_LABELS = {
@@ -9,13 +21,14 @@ const MODE_TOGGLE_LABELS = {
   icon: "Icon",
   image: "Image",
 };
-const SHAPE_MODE_OPTIONS = ["shape", "image"];
+const SHAPE_MODE_OPTIONS = ["shape", "folder", "image"];
 const SHAPE_MODE_LABELS = {
   shape: "Shape",
+  folder: "Folder",
   image: "Image",
 };
 const SHAPE_PRESET_OPTIONS = ["square", "circle", "pill", "rectangle"];
-const SHAPES = ["shape", "image", "none", ...SHAPE_PRESET_OPTIONS];
+const SHAPES = ["shape", "folder", "image", "none", ...SHAPE_PRESET_OPTIONS];
 const SHAPE_TOGGLE_LABELS = {
   square: "Square",
   circle: "Circle",
@@ -53,11 +66,6 @@ const CANVAS_SIZE_PRESETS = [400, 500, 640];
 const DEFAULT_PREVIEW_CONTEXT_MODE = "surfaces";
 const HERO_DESCRIPTION =
   "Make tiny polished icons for chats, docs, and lightweight UI work without opening a full design tool.";
-const HERO_PROOF_POINTS = [
-  "Start from text, Lucide icons, or uploaded images.",
-  "Preview against real message and surface contexts.",
-  "Export PNGs or save full-fidelity project files.",
-];
 const LANDING_TO_BUILDER_MS = 1100;
 const HERO_SAMPLE_SWAP_MS = 3000;
 const HERO_SAMPLE_SWAP_DELAY_MS = 1200;
@@ -104,6 +112,8 @@ const FONT_WEIGHT_MIN = 100;
 const FONT_WEIGHT_MAX = 1000;
 const LUCIDE_WEIGHT_MIN = 0.8;
 const LUCIDE_WEIGHT_MAX = 10;
+const CONTENT_ROTATION_MIN = -180;
+const CONTENT_ROTATION_MAX = 180;
 const IMAGE_UPLOAD_MAX_DIMENSION = 1400;
 const IMAGE_RENDER_CANVAS_SIZE = 720;
 const IMAGE_ROTATION_MIN = -180;
@@ -117,6 +127,7 @@ const IMAGE_CONTRAST_MAX = 220;
 const IMAGE_EDGE_STROKE_MAX = 28;
 const IMAGE_CROP_SIZE_MIN = 0.22;
 const IMAGE_CROP_SIZE_MAX = 1;
+const PART_OFFSET_LIMIT = 180;
 const HISTORY_LIMIT = 100;
 
 const DEFAULT_STATE = {
@@ -134,6 +145,9 @@ const DEFAULT_STATE = {
   pillWidthScale: 170,
   pillHeightScale: 72,
   radius: 24,
+  folderTabX: 12,
+  folderTabWidth: 34,
+  folderTabHeight: 20,
   fontSize: 78,
   linkTextToSize: true,
   spacing: 0,
@@ -150,6 +164,11 @@ const DEFAULT_STATE = {
   baseOpacity: 100,
   textColor: "#1f2937",
   contentOpacity: 100,
+  contentOffsetX: 0,
+  contentOffsetY: 0,
+  contentRotation: 0,
+  shapeOffsetX: 0,
+  shapeOffsetY: 0,
   outlineColor: "#d6deed",
   strokeColor: "#d6deed",
   strokeStops: ["#d6deed"],
@@ -200,15 +219,30 @@ const FONT_OPTIONS = [
   { label: "Inter", value: "Inter, system-ui, sans-serif" },
   { label: "System Sans", value: "system-ui, sans-serif" },
   { label: "Avenir Next", value: "'Avenir Next', 'Segoe UI', sans-serif" },
+  { label: "Futura", value: "Futura, 'Avenir Next', 'Trebuchet MS', sans-serif" },
+  { label: "Gill Sans", value: "'Gill Sans', 'Gill Sans MT', Calibri, sans-serif" },
   { label: "Helvetica Neue", value: "'Helvetica Neue', Arial, sans-serif" },
   { label: "Segoe UI", value: "'Segoe UI', system-ui, sans-serif" },
   { label: "Arial", value: "Arial, sans-serif" },
   { label: "Verdana", value: "Verdana, Geneva, sans-serif" },
   { label: "Trebuchet MS", value: "'Trebuchet MS', sans-serif" },
+  { label: "Tahoma", value: "Tahoma, Geneva, sans-serif" },
+  { label: "Franklin Gothic", value: "'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif" },
+  { label: "Optima", value: "Optima, Candara, 'Noto Sans', sans-serif" },
+  { label: "Impact", value: "Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif" },
   { label: "Georgia", value: "Georgia, serif" },
+  { label: "Baskerville", value: "Baskerville, 'Times New Roman', Times, serif" },
+  { label: "Palatino", value: "'Palatino Linotype', Palatino, 'Book Antiqua', serif" },
+  { label: "Didot", value: "Didot, Bodoni, 'Times New Roman', serif" },
   { label: "Times New Roman", value: "'Times New Roman', Times, serif" },
+  { label: "American Typewriter", value: "'American Typewriter', Georgia, serif" },
+  { label: "Copperplate", value: "Copperplate, Papyrus, fantasy" },
   { label: "Consolas", value: "Consolas, 'Lucida Console', 'Courier New', monospace" },
+  { label: "Menlo", value: "Menlo, Monaco, Consolas, monospace" },
+  { label: "Monaco", value: "Monaco, Menlo, Consolas, monospace" },
   { label: "Courier", value: "'Courier New', monospace" },
+  { label: "Marker Felt", value: "'Marker Felt', 'Comic Sans MS', cursive" },
+  { label: "Brush Script", value: "'Brush Script MT', 'Segoe Script', cursive" },
   {
     label: "Emoji",
     value: "'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji',sans-serif",
@@ -238,6 +272,69 @@ const QUICK_PREVIEW_SURFACES = [
 const PREVIEW_CONTEXT_OPTIONS = [
   { id: "surfaces", label: "Surfaces" },
   { id: "message", label: "Message + reaction" },
+];
+const INSPECT_PARTS = [
+  { id: "content", label: "Content", section: "content" },
+  { id: "base", label: "Base", section: "base" },
+  { id: "back", label: "Back layer", section: "back" },
+];
+const WIZARD_STEPS = [
+  { id: "content", title: "Content" },
+  { id: "base", title: "Base" },
+  { id: "back", title: "Back" },
+  { id: "particles", title: "Particles" },
+  { id: "share", title: "Share" },
+];
+const WIZARD_WALKTHROUGH_STEPS = [
+  {
+    id: "steps",
+    wizardStepId: "content",
+    target: "wizard-steps",
+    title: "Move through the Wizard",
+    body: "These step controls jump between the focused parts of an iquan. The arrows move one step at a time.",
+  },
+  {
+    id: "content",
+    wizardStepId: "content",
+    target: "wizard-content-card",
+    title: "Choose the content",
+    body: "This step picks what sits inside the base: text, an uploaded image, or a Lucide icon, plus its size, color, and placement.",
+  },
+  {
+    id: "preview",
+    wizardStepId: "content",
+    target: "preview-stage",
+    title: "Watch the live preview",
+    body: "The preview updates as you edit. You can select and adjust visible pieces directly here when you need finer control.",
+  },
+  {
+    id: "base",
+    wizardStepId: "base",
+    target: "wizard-base-card",
+    title: "Shape the base",
+    body: "The Base step controls the container behind the content: size, shape, fill, stroke, rounding, and transparency.",
+  },
+  {
+    id: "back",
+    wizardStepId: "back",
+    target: "wizard-back-card",
+    title: "Add depth",
+    body: "The Back step sets the offset shadow layer. Use it for a sticker-like second layer or reset it for a flat icon.",
+  },
+  {
+    id: "particles",
+    wizardStepId: "particles",
+    target: "wizard-particles-card",
+    title: "Attach particles",
+    body: "Particles are smaller iquans anchored around the base. Pick a slot here, then refine the particle in the full editor.",
+  },
+  {
+    id: "share",
+    wizardStepId: "share",
+    target: "wizard-share-card",
+    title: "Export or keep editing",
+    body: "Finish here by exporting a PNG, copying a share link, saving a project, or opening the full editor for more control.",
+  },
 ];
 const HERO_SAMPLE_BLUEPRINTS = [
   {
@@ -780,6 +877,128 @@ const HERO_SAMPLE_BLUEPRINTS = [
       ),
     },
   },
+  {
+    key: "rocket-launch",
+    mode: "icon",
+    lucide: "rocket",
+    lucideWeight: 1.7,
+    shape: "circle",
+    size: 152,
+    iconScale: 56,
+    fillStops: ["#eef2ff", "#c7d2fe"],
+    strokeStops: ["#6366f1"],
+    textColor: "#4338ca",
+    outline: 5,
+    backColor: "#a5b4fc",
+    backDistance: 10,
+    backAngle: 24,
+  },
+  {
+    key: "pin-drop",
+    mode: "icon",
+    lucide: "map-pin",
+    lucideWeight: 2.2,
+    shape: "pill",
+    size: 154,
+    iconScale: 52,
+    pillWidthScale: 182,
+    pillHeightScale: 74,
+    fillStops: ["#f0fdf4", "#dcfce7"],
+    strokeStops: ["#22c55e"],
+    textColor: "#15803d",
+    outline: 5,
+    backColor: "#86efac",
+    backDistance: 8,
+    backAngle: 38,
+  },
+  {
+    key: "badge-check",
+    base: {
+      mode: "icon",
+      lucide: "badge-check",
+      lucideWeight: 1.8,
+      shape: "circle",
+      size: 150,
+      iconScale: 58,
+      fillStops: ["#ecfeff", "#cffafe"],
+      strokeStops: ["#06b6d4"],
+      textColor: "#0e7490",
+      outline: 5,
+      backColor: "#67e8f9",
+      backDistance: 8,
+      backAngle: 28,
+    },
+    particles: {
+      bottomRight: createHeroParticle(
+        {
+          mode: "text",
+          content: "1",
+          shape: "circle",
+          size: 56,
+          fontSize: 34,
+          fontWeight: "900",
+          fillStops: ["#fff1f2", "#fecdd3"],
+          strokeStops: ["#fb7185"],
+          textColor: "#e11d48",
+          outline: 3,
+        },
+        8,
+        10,
+      ),
+    },
+  },
+  {
+    key: "palette-square",
+    mode: "icon",
+    lucide: "palette",
+    lucideWeight: 1.5,
+    shape: "square",
+    size: 148,
+    iconScale: 56,
+    radius: 28,
+    fillStops: ["#fdf2f8", "#fbcfe8"],
+    strokeStops: ["#ec4899"],
+    textColor: "#be185d",
+    outline: 5,
+    backColor: "#f9a8d4",
+    backDistance: 9,
+    backAngle: 42,
+  },
+  {
+    key: "bell-note",
+    mode: "icon",
+    lucide: "bell-ring",
+    lucideWeight: 2,
+    shape: "rectangle",
+    size: 156,
+    iconScale: 52,
+    widthScale: 176,
+    radius: 22,
+    fillStops: ["#fefce8", "#fef3c7"],
+    strokeStops: ["#eab308"],
+    textColor: "#a16207",
+    outline: 5,
+    backColor: "#fde047",
+    backDistance: 8,
+    backAngle: 18,
+  },
+  {
+    key: "slash-command",
+    mode: "text",
+    content: "/",
+    shape: "square",
+    size: 148,
+    radius: 24,
+    fontSize: 86,
+    fontWeight: "900",
+    fillStops: ["#f8fafc", "#e2e8f0"],
+    strokeStops: ["#475569"],
+    textColor: "#0f172a",
+    outline: 6,
+    backColor: "#cbd5e1",
+    backDistance: 8,
+    backAngle: 32,
+  },
 ];
 
 const STARTER_TEMPLATES = [
@@ -866,6 +1085,9 @@ const COMPACT_ICON_FIELDS = [
   ["pillWidthScale", "pw"],
   ["pillHeightScale", "ph"],
   ["radius", "r"],
+  ["folderTabX", "ftx"],
+  ["folderTabWidth", "ftw"],
+  ["folderTabHeight", "fth"],
   ["fontSize", "fs"],
   ["linkTextToSize", "lt"],
   ["spacing", "sp"],
@@ -880,6 +1102,11 @@ const COMPACT_ICON_FIELDS = [
   ["baseOpacity", "bo"],
   ["textColor", "tc"],
   ["contentOpacity", "co"],
+  ["contentOffsetX", "cox"],
+  ["contentOffsetY", "coy"],
+  ["contentRotation", "cr"],
+  ["shapeOffsetX", "sox"],
+  ["shapeOffsetY", "soy"],
   ["strokeStops", "o"],
   ["strokeGradientType", "ot"],
   ["strokeGradientAngle", "oa"],
@@ -929,6 +1156,35 @@ const COMPACT_TOKEN_TO_ICON_FIELD = Object.fromEntries(
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
+}
+
+function getWalkthroughCardPosition(rect) {
+  if (typeof window === "undefined" || !rect) return { top: 16, left: 16 };
+
+  const margin = 16;
+  const gap = 14;
+  const cardWidth = Math.min(340, window.innerWidth - margin * 2);
+  const cardHeightEstimate = 230;
+  let left = rect.right + gap;
+  let top = rect.top + rect.height / 2 - cardHeightEstimate / 2;
+
+  if (left + cardWidth > window.innerWidth - margin) {
+    left = rect.left - cardWidth - gap;
+  }
+
+  if (left < margin) {
+    left = clamp(rect.left, margin, window.innerWidth - cardWidth - margin);
+    top = rect.bottom + gap;
+  }
+
+  if (top + cardHeightEstimate > window.innerHeight - margin) {
+    top = rect.top - cardHeightEstimate - gap;
+  }
+
+  return {
+    left: clamp(left, margin, Math.max(margin, window.innerWidth - cardWidth - margin)),
+    top: clamp(top, margin, Math.max(margin, window.innerHeight - cardHeightEstimate - margin)),
+  };
 }
 
 function normalizeLucideName(value) {
@@ -1005,7 +1261,7 @@ function getContentDrivenWidth(state, fontSize, minWidth, visibleOutline) {
 
 function getDimensions(state, fontSize, visibleOutline) {
   const base = state.size;
-  if (state.shape === "shape") {
+  if (state.shape === "shape" || state.shape === "folder") {
     return {
       width: Math.max(1, Math.round(base * (state.widthScale / 100))),
       height: Math.max(1, Math.round(base * (state.heightScale / 100))),
@@ -1015,43 +1271,88 @@ function getDimensions(state, fontSize, visibleOutline) {
   return { width: base, height: base };
 }
 
+function getTextFitBounds(state, visibleOutline, dimensions) {
+  const innerWidth = Math.max(
+    1,
+    dimensions.width - state.inset * 2 - visibleOutline * 2,
+  );
+  const innerHeight = Math.max(
+    1,
+    dimensions.height - state.inset * 2 - visibleOutline * 2,
+  );
+  const widthSlack = Math.min(14, Math.max(2, Math.round(innerWidth * 0.14)));
+  const heightSlack = Math.min(12, Math.max(2, Math.round(innerHeight * 0.12)));
+
+  return {
+    width: Math.max(1, innerWidth - widthSlack),
+    height: Math.max(1, innerHeight - heightSlack),
+  };
+}
+
+function doesTextFitAtScale(state, visibleOutline, fontSize, iconScale = state.iconScale) {
+  const dimensions = getDimensions(state, fontSize, visibleOutline);
+  const scale = iconScale / 100;
+  const fitBounds = getTextFitBounds(state, visibleOutline, dimensions);
+  const safeWidth = Math.max(1, fitBounds.width * scale);
+  const safeHeight = Math.max(1, fitBounds.height * scale);
+  const measured = measureTextWidth(
+    state.content || " ",
+    fontSize,
+    state.fontWeight,
+    state.fontFamily,
+    state.spacing,
+  );
+  return measured <= safeWidth && fontSize <= safeHeight;
+}
+
+function getLinkedTextContentScaleLimit(state, visibleOutline = state.outline) {
+  if (!state.contentEnabled || state.mode !== "text" || !state.linkTextToSize) {
+    return null;
+  }
+
+  const requestedSize = Math.max(8, Math.round(state.fontSize));
+  if (!doesTextFitAtScale(state, visibleOutline, requestedSize, ICON_SCALE_MAX)) {
+    return null;
+  }
+
+  let low = ICON_SCALE_MIN;
+  let high = ICON_SCALE_MAX;
+  let best = ICON_SCALE_MAX;
+
+  while (low <= high) {
+    const mid = Math.floor((low + high) / 2);
+    if (doesTextFitAtScale(state, visibleOutline, requestedSize, mid)) {
+      best = mid;
+      high = mid - 1;
+    } else {
+      low = mid + 1;
+    }
+  }
+
+  return best;
+}
+
+function resolveIconScaleForStateChange(state, nextScale) {
+  const clampedScale = clamp(nextScale, ICON_SCALE_MIN, ICON_SCALE_MAX);
+  const linkedTextLimit = getLinkedTextContentScaleLimit(state, state.outline);
+  if (
+    linkedTextLimit !== null &&
+    clampedScale > state.iconScale &&
+    clampedScale > linkedTextLimit
+  ) {
+    return Math.max(state.iconScale, linkedTextLimit);
+  }
+
+  return clampedScale;
+}
+
 function fitTextSize(state, visibleOutline) {
   if (state.mode !== "text") {
     return Math.round(state.size * 0.48 * (state.iconScale / 100));
   }
 
-  const getTextFitBounds = (dimensions) => {
-    const innerWidth = Math.max(
-      1,
-      dimensions.width - state.inset * 2 - visibleOutline * 2,
-    );
-    const innerHeight = Math.max(
-      1,
-      dimensions.height - state.inset * 2 - visibleOutline * 2,
-    );
-    const widthSlack = Math.min(14, Math.max(2, Math.round(innerWidth * 0.14)));
-    const heightSlack = Math.min(12, Math.max(2, Math.round(innerHeight * 0.12)));
-
-    return {
-      width: Math.max(1, innerWidth - widthSlack),
-      height: Math.max(1, innerHeight - heightSlack),
-    };
-  };
-
   const doesTextFit = (fontSize) => {
-    const dimensions = getDimensions(state, fontSize, visibleOutline);
-    const iconScale = state.iconScale / 100;
-    const fitBounds = getTextFitBounds(dimensions);
-    const safeWidth = Math.max(1, fitBounds.width * iconScale);
-    const safeHeight = Math.max(1, fitBounds.height * iconScale);
-    const measured = measureTextWidth(
-      state.content || " ",
-      fontSize,
-      state.fontWeight,
-      state.fontFamily,
-      state.spacing,
-    );
-    return measured <= safeWidth && fontSize <= safeHeight;
+    return doesTextFitAtScale(state, visibleOutline, fontSize);
   };
 
   const findLargestFittingSize = (maxSize) => {
@@ -1127,6 +1428,119 @@ function getMainSurfaceStyle(state, visibleOutline) {
     backgroundOrigin: "border-box",
     backgroundClip: "padding-box, border-box",
   };
+}
+
+function hexToRgb(value) {
+  const safe = sanitizeHexColor(value, "#000000").slice(1);
+  return {
+    r: Number.parseInt(safe.slice(0, 2), 16),
+    g: Number.parseInt(safe.slice(2, 4), 16),
+    b: Number.parseInt(safe.slice(4, 6), 16),
+  };
+}
+
+function rgbToHex({ r, g, b }) {
+  return `#${[r, g, b]
+    .map((channel) => clamp(Math.round(channel), 0, 255).toString(16).padStart(2, "0"))
+    .join("")}`;
+}
+
+function mixHexColors(color, mixWith, amount) {
+  const base = hexToRgb(color);
+  const target = hexToRgb(mixWith);
+  return rgbToHex({
+    r: base.r + (target.r - base.r) * amount,
+    g: base.g + (target.g - base.g) * amount,
+    b: base.b + (target.b - base.b) * amount,
+  });
+}
+
+function getSvgLinearGradientPoints(angle) {
+  const radians = ((clamp(parseIntOr(angle, 135), 0, 359) - 90) * Math.PI) / 180;
+  const x = Math.cos(radians);
+  const y = Math.sin(radians);
+  return {
+    x1: `${50 - x * 50}%`,
+    y1: `${50 - y * 50}%`,
+    x2: `${50 + x * 50}%`,
+    y2: `${50 + y * 50}%`,
+  };
+}
+
+function SvgPaint({ id, stops, gradientType, angle, centerX, centerY, fallback }) {
+  const safeStops = sanitizeColorStops(stops, fallback);
+  if (safeStops.length < 2) return null;
+
+  if (gradientType === "radial") {
+    return (
+      <radialGradient
+        id={id}
+        cx={`${clamp(parseIntOr(centerX, 50), 0, 100)}%`}
+        cy={`${clamp(parseIntOr(centerY, 50), 0, 100)}%`}
+        r="78%"
+      >
+        {safeStops.map((stop, index) => (
+          <stop
+            key={`${id}-${index}`}
+            offset={`${(index / Math.max(1, safeStops.length - 1)) * 100}%`}
+            stopColor={stop}
+          />
+        ))}
+      </radialGradient>
+    );
+  }
+
+  return (
+    <linearGradient id={id} {...getSvgLinearGradientPoints(angle)}>
+      {safeStops.map((stop, index) => (
+        <stop
+          key={`${id}-${index}`}
+          offset={`${(index / Math.max(1, safeStops.length - 1)) * 100}%`}
+          stopColor={stop}
+        />
+      ))}
+    </linearGradient>
+  );
+}
+
+function getSvgPaintReference(id, stops, fallback) {
+  const safeStops = sanitizeColorStops(stops, fallback);
+  return safeStops.length > 1 ? `url(#${id})` : safeStops[0];
+}
+
+function getFolderPath(width, height, radius, tabX, tabWidthValue, tabHeightValue, inset = 0) {
+  const x = inset;
+  const y = inset;
+  const w = Math.max(1, width - inset * 2);
+  const h = Math.max(1, height - inset * 2);
+  const tabHeight = clamp(h * (tabHeightValue / 100), 8, h * 0.42);
+  const tabWidth = clamp(w * (tabWidthValue / 100), 24, w * 0.82);
+  const tabSlope = clamp(w * 0.06, 8, 18);
+  const bodyTop = y + tabHeight;
+  const r = clamp(radius, 2, Math.min(w, h - tabHeight) / 2);
+  const maxTabStart = Math.max(4, w - tabWidth - tabSlope - 8);
+  const minTabStart = Math.min(r, maxTabStart);
+  const tabStart = clamp(w * (tabX / 100), minTabStart, maxTabStart);
+  const tabRadius = clamp(radius * 0.55, 3, tabHeight * 0.42);
+
+  return [
+    `M ${x + r} ${bodyTop}`,
+    `L ${x + tabStart} ${bodyTop}`,
+    `Q ${x + tabStart + tabRadius} ${bodyTop} ${x + tabStart + tabSlope} ${y + tabRadius}`,
+    `Q ${x + tabStart + tabSlope + 2} ${y} ${x + tabStart + tabSlope + tabRadius} ${y}`,
+    `L ${x + tabStart + tabWidth} ${y}`,
+    `Q ${x + tabStart + tabWidth + tabRadius} ${y} ${x + tabStart + tabWidth + tabSlope} ${bodyTop - tabRadius}`,
+    `Q ${x + tabStart + tabWidth + tabSlope + 2} ${bodyTop} ${x + tabStart + tabWidth + tabSlope + tabRadius} ${bodyTop}`,
+    `L ${x + w - r} ${bodyTop}`,
+    `Q ${x + w} ${bodyTop} ${x + w} ${bodyTop + r}`,
+    `L ${x + w} ${y + h - r}`,
+    `Q ${x + w} ${y + h} ${x + w - r} ${y + h}`,
+    `L ${x + r} ${y + h}`,
+    `Q ${x} ${y + h} ${x} ${y + h - r}`,
+    `L ${x} ${bodyTop + r}`,
+    `Q ${x} ${bodyTop} ${x + r} ${bodyTop}`,
+    "Z",
+  ].join(" ");
 }
 
 function sanitizeHexColor(value, fallback) {
@@ -1348,16 +1762,6 @@ function getImageSourceRect(imageState, imageWidth, imageHeight) {
     sy,
     sw: cropSize,
     sh: cropSize,
-  };
-}
-
-function hexToRgb(hex) {
-  const normalized = sanitizeHexColor(hex, "#000000");
-  const value = normalized.slice(1);
-  return {
-    r: Number.parseInt(value.slice(0, 2), 16),
-    g: Number.parseInt(value.slice(2, 4), 16),
-    b: Number.parseInt(value.slice(4, 6), 16),
   };
 }
 
@@ -1621,7 +2025,7 @@ function sanitizeIconState(value) {
     mode: contentEnabled ? rawMode : DEFAULT_STATE.mode,
     contentEnabled,
     shape:
-      shapeEnabled && rawShape === "image"
+      shapeEnabled && (rawShape === "image" || rawShape === "folder")
         ? rawShape
         : DEFAULT_STATE.shape,
     shapeEnabled,
@@ -1674,6 +2078,21 @@ function sanitizeIconState(value) {
       rawShape === "circle" || rawShape === "pill"
         ? SHAPE_RADIUS_MAX
         : clamp(parseIntOr(source.radius, DEFAULT_STATE.radius), 0, SHAPE_RADIUS_MAX),
+    folderTabX: clamp(
+      parseIntOr(source.folderTabX, DEFAULT_STATE.folderTabX),
+      0,
+      70,
+    ),
+    folderTabWidth: clamp(
+      parseIntOr(source.folderTabWidth, DEFAULT_STATE.folderTabWidth),
+      18,
+      82,
+    ),
+    folderTabHeight: clamp(
+      parseIntOr(source.folderTabHeight, DEFAULT_STATE.folderTabHeight),
+      10,
+      42,
+    ),
     fontSize: clamp(parseIntOr(source.fontSize, DEFAULT_STATE.fontSize), 16, 180),
     linkTextToSize: source.linkTextToSize !== false,
     spacing: clamp(parseIntOr(source.spacing, DEFAULT_STATE.spacing), 0, 20),
@@ -1720,6 +2139,31 @@ function sanitizeIconState(value) {
       parseIntOr(source.contentOpacity, DEFAULT_STATE.contentOpacity),
       0,
       100,
+    ),
+    contentOffsetX: clamp(
+      parseFloatOr(source.contentOffsetX, DEFAULT_STATE.contentOffsetX),
+      -PART_OFFSET_LIMIT,
+      PART_OFFSET_LIMIT,
+    ),
+    contentOffsetY: clamp(
+      parseFloatOr(source.contentOffsetY, DEFAULT_STATE.contentOffsetY),
+      -PART_OFFSET_LIMIT,
+      PART_OFFSET_LIMIT,
+    ),
+    contentRotation: clamp(
+      parseFloatOr(source.contentRotation, DEFAULT_STATE.contentRotation),
+      CONTENT_ROTATION_MIN,
+      CONTENT_ROTATION_MAX,
+    ),
+    shapeOffsetX: clamp(
+      parseFloatOr(source.shapeOffsetX, DEFAULT_STATE.shapeOffsetX),
+      -PART_OFFSET_LIMIT,
+      PART_OFFSET_LIMIT,
+    ),
+    shapeOffsetY: clamp(
+      parseFloatOr(source.shapeOffsetY, DEFAULT_STATE.shapeOffsetY),
+      -PART_OFFSET_LIMIT,
+      PART_OFFSET_LIMIT,
     ),
     outlineColor: strokeStops[0],
     strokeColor: strokeStops[0],
@@ -2255,6 +2699,13 @@ function resolvePageModeFromUrl(url, options = {}) {
   return normalizedPathname === copiedLinkPath ? "copiedLink" : "editor";
 }
 
+function resolveWorkspaceModeFromUrl(url) {
+  const mode = String(url?.searchParams?.get("view") || url?.searchParams?.get("mode") || "")
+    .trim()
+    .toLowerCase();
+  return mode === "editor" ? "editor" : "wizard";
+}
+
 function extractShareCodeFromSearch(url) {
   const namedSearchCode = url.searchParams.get("code") || url.searchParams.get("c");
   if (isShareCodeFormat(namedSearchCode)) return namedSearchCode.trim();
@@ -2353,6 +2804,9 @@ function createShareUrl(code, options = {}) {
   url.search = "";
   if (code) {
     url.searchParams.set("code", code);
+  }
+  if (options.view === "editor" && options.destination !== "copiedLink") {
+    url.searchParams.set("view", "editor");
   }
   url.hash = "";
   return url.toString();
@@ -2548,30 +3002,73 @@ const IQUAN_LOGO_CODE = encodeState(
   DEFAULT_CANVAS_SIZE,
 );
 
-function getCompositeBounds(baseMetrics, particleLayers) {
-  let minX = Math.min(0, baseMetrics.offset.x);
-  let minY = Math.min(0, baseMetrics.offset.y);
-  let maxX = Math.max(
-    baseMetrics.dimensions.width,
-    baseMetrics.dimensions.width + baseMetrics.offset.x,
-  );
-  let maxY = Math.max(
-    baseMetrics.dimensions.height,
-    baseMetrics.dimensions.height + baseMetrics.offset.y,
-  );
+function getIconVisualBounds(iconState, metrics) {
+  const visibleBounds = [];
+
+  if (isInspectPartVisible(iconState, "base")) {
+    visibleBounds.push({
+      minX: iconState.shapeOffsetX,
+      minY: iconState.shapeOffsetY,
+      maxX: iconState.shapeOffsetX + metrics.dimensions.width,
+      maxY: iconState.shapeOffsetY + metrics.dimensions.height,
+    });
+  }
+
+  const contentBounds = isInspectPartVisible(iconState, "content")
+    ? getInspectContentBounds(iconState, metrics)
+    : null;
+
+  if (contentBounds) {
+    visibleBounds.push({
+      minX: contentBounds.left,
+      minY: contentBounds.top,
+      maxX: contentBounds.left + contentBounds.width,
+      maxY: contentBounds.top + contentBounds.height,
+    });
+  }
+
+  if (isInspectPartVisible(iconState, "back")) {
+    const backMinX = metrics.offset.x + iconState.shapeOffsetX;
+    const backMinY = metrics.offset.y + iconState.shapeOffsetY;
+    visibleBounds.push({
+      minX: backMinX,
+      minY: backMinY,
+      maxX: backMinX + metrics.dimensions.width,
+      maxY: backMinY + metrics.dimensions.height,
+    });
+  }
+
+  if (visibleBounds.length === 0) {
+    return {
+      minX: 0,
+      minY: 0,
+      maxX: metrics.dimensions.width,
+      maxY: metrics.dimensions.height,
+    };
+  }
+
+  return {
+    minX: Math.min(...visibleBounds.map((bounds) => bounds.minX)),
+    minY: Math.min(...visibleBounds.map((bounds) => bounds.minY)),
+    maxX: Math.max(...visibleBounds.map((bounds) => bounds.maxX)),
+    maxY: Math.max(...visibleBounds.map((bounds) => bounds.maxY)),
+  };
+}
+
+function getCompositeBounds(baseState, baseMetrics, particleLayers) {
+  const baseBounds = getIconVisualBounds(baseState, baseMetrics);
+  let minX = baseBounds.minX;
+  let minY = baseBounds.minY;
+  let maxX = baseBounds.maxX;
+  let maxY = baseBounds.maxY;
 
   for (const layer of particleLayers) {
     const { placement, metrics } = layer;
-    const layerMinX = Math.min(placement.left, placement.left + metrics.offset.x);
-    const layerMinY = Math.min(placement.top, placement.top + metrics.offset.y);
-    const layerMaxX = Math.max(
-      placement.left + metrics.dimensions.width,
-      placement.left + metrics.offset.x + metrics.dimensions.width,
-    );
-    const layerMaxY = Math.max(
-      placement.top + metrics.dimensions.height,
-      placement.top + metrics.offset.y + metrics.dimensions.height,
-    );
+    const iconBounds = getIconVisualBounds(layer.particle.icon, metrics);
+    const layerMinX = placement.left + iconBounds.minX;
+    const layerMinY = placement.top + iconBounds.minY;
+    const layerMaxX = placement.left + iconBounds.maxX;
+    const layerMaxY = placement.top + iconBounds.maxY;
     minX = Math.min(minX, layerMinX);
     minY = Math.min(minY, layerMinY);
     maxX = Math.max(maxX, layerMaxX);
@@ -2638,6 +3135,117 @@ function buildCornerPoints(baseMetrics) {
       baseMetrics.dimensions.width,
       baseMetrics.dimensions.height,
     ),
+  }));
+}
+
+function getInspectTargetId(target, part) {
+  const targetId = target.type === "particle" ? `particle:${target.corner}` : "base";
+  return `${targetId}:${part}`;
+}
+
+function getInspectTargetDisplayName(target, part) {
+  const ownerLabel =
+    target.type === "particle" ? `${getCornerLabel(target.corner)} particle` : "Base";
+  const partLabel = INSPECT_PARTS.find((option) => option.id === part)?.label || "Part";
+  return `${ownerLabel} ${partLabel.toLowerCase()}`;
+}
+
+function isInspectPartVisible(iconState, part) {
+  if (part === "content") {
+    return iconState.contentEnabled && iconState.mode !== "none";
+  }
+
+  if (part === "base") {
+    return iconState.shapeEnabled && iconState.shape !== "none";
+  }
+
+  if (part === "back") {
+    return (
+      iconState.shapeEnabled &&
+      iconState.shape !== "none" &&
+      iconState.backLayerEnabled &&
+      iconState.backDistance > 0
+    );
+  }
+
+  return false;
+}
+
+function getInspectContentBounds(iconState, metrics) {
+  const { width, height } = metrics.dimensions;
+
+  if (iconState.mode === "image") {
+    const inset = iconState.inset + metrics.visibleOutline;
+    return {
+      left: inset + iconState.contentOffsetX,
+      top: inset + iconState.contentOffsetY,
+      width: Math.max(10, width - inset * 2),
+      height: Math.max(10, height - inset * 2),
+      radius: Math.max(8, metrics.borderRadius - inset),
+    };
+  }
+
+  if (iconState.mode === "text") {
+    const textWidth = measureTextWidth(
+      iconState.content || " ",
+      metrics.fittedFontSize,
+      iconState.fontWeight,
+      iconState.fontFamily,
+      iconState.spacing,
+    );
+    const boundWidth = clamp(textWidth, 16, width);
+    const boundHeight = clamp(metrics.fittedFontSize * 1.08, 16, height);
+    return {
+      left: (width - boundWidth) / 2 + iconState.contentOffsetX,
+      top: (height - boundHeight) / 2 + iconState.contentOffsetY,
+      width: boundWidth,
+      height: boundHeight,
+      radius: Math.min(12, boundHeight / 2),
+    };
+  }
+
+  const contentSize = Math.min(metrics.iconRenderSize, Math.max(width, height));
+  return {
+    left: (width - contentSize) / 2 + iconState.contentOffsetX,
+    top: (height - contentSize) / 2 + iconState.contentOffsetY,
+    width: contentSize,
+    height: contentSize,
+    radius: Math.min(14, contentSize / 2),
+  };
+}
+
+function getInspectPartBounds(iconState, metrics, part) {
+  if (part === "content") {
+    return getInspectContentBounds(iconState, metrics);
+  }
+
+  if (part === "back") {
+    return {
+      left: metrics.offset.x + iconState.shapeOffsetX,
+      top: metrics.offset.y + iconState.shapeOffsetY,
+      width: metrics.dimensions.width,
+      height: metrics.dimensions.height,
+      radius: metrics.borderRadius,
+    };
+  }
+
+  return {
+    left: iconState.shapeOffsetX,
+    top: iconState.shapeOffsetY,
+    width: metrics.dimensions.width,
+    height: metrics.dimensions.height,
+    radius: metrics.borderRadius,
+  };
+}
+
+function buildInspectTargetsForIcon(target, iconState, metrics) {
+  return INSPECT_PARTS.filter((part) => isInspectPartVisible(iconState, part.id)).map((part) => ({
+    id: getInspectTargetId(target, part.id),
+    label: getInspectTargetDisplayName(target, part.id),
+    target,
+    part: part.id,
+    section: part.section,
+    bounds: getInspectPartBounds(iconState, metrics, part.id),
   }));
 }
 
@@ -2744,6 +3352,14 @@ function isEditableKeyTarget(target) {
   return tagName === "INPUT" || tagName === "TEXTAREA" || tagName === "SELECT";
 }
 
+function getPointerViewBoxPoint(event, element, width, height = width) {
+  const rect = element.getBoundingClientRect();
+  return {
+    x: ((event.clientX - rect.left) / Math.max(1, rect.width)) * width,
+    y: ((event.clientY - rect.top) / Math.max(1, rect.height)) * height,
+  };
+}
+
 function BackLayerWheel({
   angle,
   distance,
@@ -2767,9 +3383,9 @@ function BackLayerWheel({
 
   const updateFromPointer = (event) => {
     if (!wheelRef.current) return;
-    const rect = wheelRef.current.getBoundingClientRect();
-    const x = event.clientX - rect.left - center;
-    const y = event.clientY - rect.top - center;
+    const pointer = getPointerViewBoxPoint(event, wheelRef.current, size);
+    const x = pointer.x - center;
+    const y = pointer.y - center;
     const rawDistance = Math.hypot(x, y);
     const clampedDistance = Math.min(rawDistance, radius);
     const nextDistance = Math.round((clampedDistance / radius) * MAX_BACK_DISTANCE);
@@ -2908,6 +3524,174 @@ function BackLayerWheel({
   );
 }
 
+function ContentZoneControl({ iconState, metrics, onChange, onReset }) {
+  const zoneRef = useRef(null);
+  const draggingRef = useRef(false);
+  const size = 186;
+  const padding = 14;
+  const center = size / 2;
+  const dimensions = metrics.dimensions;
+  const zoneScale = Math.min(
+    (size - padding * 2) / Math.max(1, dimensions.width),
+    (size - padding * 2) / Math.max(1, dimensions.height),
+  );
+  const zoneWidth = Math.max(1, dimensions.width * zoneScale);
+  const zoneHeight = Math.max(1, dimensions.height * zoneScale);
+  const zoneLeft = center - zoneWidth / 2;
+  const zoneTop = center - zoneHeight / 2;
+  const maxOffsetX = Math.max(1, dimensions.width / 2);
+  const maxOffsetY = Math.max(1, dimensions.height / 2);
+  const safeOffsetX = clamp(iconState.contentOffsetX, -maxOffsetX, maxOffsetX);
+  const safeOffsetY = clamp(iconState.contentOffsetY, -maxOffsetY, maxOffsetY);
+  const knobX = center + safeOffsetX * zoneScale;
+  const knobY = center + safeOffsetY * zoneScale;
+  const isFolder = iconState.shapeEnabled && iconState.shape === "folder";
+  const isCircle =
+    iconState.shape === "shape" &&
+    Math.abs(dimensions.width - dimensions.height) <= 2 &&
+    metrics.borderRadius >= Math.min(dimensions.width, dimensions.height) / 2 - 1;
+  const zoneRadius = isCircle
+    ? zoneWidth / 2
+    : Math.min(metrics.borderRadius * zoneScale, Math.min(zoneWidth, zoneHeight) / 2);
+
+  const applyOffset = (x, y) => {
+    onChange(
+      clamp(Number(x.toFixed(2)), -maxOffsetX, maxOffsetX),
+      clamp(Number(y.toFixed(2)), -maxOffsetY, maxOffsetY),
+    );
+  };
+
+  const updateFromPointer = (event) => {
+    if (!zoneRef.current) return;
+    const pointer = getPointerViewBoxPoint(event, zoneRef.current, size);
+    const x = (pointer.x - center) / zoneScale;
+    const y = (pointer.y - center) / zoneScale;
+    applyOffset(x, y);
+  };
+
+  const handlePointerDown = (event) => {
+    draggingRef.current = true;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    updateFromPointer(event);
+  };
+
+  const handlePointerMove = (event) => {
+    if (!draggingRef.current) return;
+    updateFromPointer(event);
+  };
+
+  const handlePointerUp = (event) => {
+    draggingRef.current = false;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  };
+
+  const handleZoneKeyDown = (event) => {
+    const step = event.shiftKey ? 8 : 1;
+    let nextX = iconState.contentOffsetX;
+    let nextY = iconState.contentOffsetY;
+
+    if (event.key === "ArrowUp") {
+      nextY -= step;
+    } else if (event.key === "ArrowDown") {
+      nextY += step;
+    } else if (event.key === "ArrowLeft") {
+      nextX -= step;
+    } else if (event.key === "ArrowRight") {
+      nextX += step;
+    } else if (event.key === "Home") {
+      nextX = 0;
+      nextY = 0;
+    } else {
+      return;
+    }
+
+    event.preventDefault();
+    applyOffset(nextX, nextY);
+  };
+
+  return (
+    <div className="zone-layout">
+      <div
+        ref={zoneRef}
+        className="zone"
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+        role="group"
+        tabIndex={0}
+        aria-label="Content Zone"
+        aria-description="Arrow keys move content inside the base zone."
+        onKeyDown={handleZoneKeyDown}
+      >
+        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true">
+          {isFolder ? (
+            <path
+              d={getFolderPath(
+                zoneWidth,
+                zoneHeight,
+                zoneRadius,
+                iconState.folderTabX,
+                iconState.folderTabWidth,
+                iconState.folderTabHeight,
+                1,
+              )}
+              transform={`translate(${zoneLeft} ${zoneTop})`}
+              className="zone-shape"
+            />
+          ) : (
+            <rect
+              x={zoneLeft}
+              y={zoneTop}
+              width={zoneWidth}
+              height={zoneHeight}
+              rx={zoneRadius}
+              ry={zoneRadius}
+              className="zone-shape"
+            />
+          )}
+          <line x1={zoneLeft} y1={center} x2={zoneLeft + zoneWidth} y2={center} className="zone-axis" />
+          <line x1={center} y1={zoneTop} x2={center} y2={zoneTop + zoneHeight} className="zone-axis" />
+          <line x1={center} y1={center} x2={knobX} y2={knobY} className="zone-line" />
+          <circle cx={center} cy={center} r="5" className="zone-center" />
+          <circle cx={knobX} cy={knobY} r="9" className="zone-knob" />
+        </svg>
+      </div>
+      <div className="zone-values">
+        <label>
+          X
+          <input
+            type="number"
+            min={-Math.round(maxOffsetX)}
+            max={Math.round(maxOffsetX)}
+            value={Math.round(iconState.contentOffsetX)}
+            onChange={(event) =>
+              applyOffset(parseFloatOr(event.target.value, 0), iconState.contentOffsetY)
+            }
+          />
+        </label>
+        <label>
+          Y
+          <input
+            type="number"
+            min={-Math.round(maxOffsetY)}
+            max={Math.round(maxOffsetY)}
+            value={Math.round(iconState.contentOffsetY)}
+            onChange={(event) =>
+              applyOffset(iconState.contentOffsetX, parseFloatOr(event.target.value, 0))
+            }
+          />
+        </label>
+        <button type="button" className="btn-ghost zone-reset" onClick={onReset}>
+          Reset zone
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function GradientDirectionWheel({
   mode,
   angle,
@@ -2931,9 +3715,9 @@ function GradientDirectionWheel({
 
   const updateFromPointer = (event) => {
     if (!wheelRef.current) return;
-    const rect = wheelRef.current.getBoundingClientRect();
-    const x = event.clientX - rect.left - center;
-    const y = event.clientY - rect.top - center;
+    const pointer = getPointerViewBoxPoint(event, wheelRef.current, size);
+    const x = pointer.x - center;
+    const y = pointer.y - center;
 
     if (mode === "radial") {
       const distance = Math.hypot(x, y);
@@ -3188,6 +3972,124 @@ function ToggleGroup({ options, value, onChange, labels }) {
         </button>
       ))}
     </div>
+  );
+}
+
+function FolderControls({ state, patchState }) {
+  return (
+    <>
+      <div className="grid-two">
+        <label>
+          Tab position
+          <input
+            type="range"
+            min={0}
+            max={70}
+            step={1}
+            value={state.folderTabX}
+            onChange={(event) => patchState({ folderTabX: Number(event.target.value) })}
+          />
+          <small>{state.folderTabX}% from left</small>
+        </label>
+        <label>
+          Tab width
+          <input
+            type="range"
+            min={18}
+            max={82}
+            step={1}
+            value={state.folderTabWidth}
+            onChange={(event) => patchState({ folderTabWidth: Number(event.target.value) })}
+          />
+          <small>{state.folderTabWidth}%</small>
+        </label>
+      </div>
+
+      <label>
+        Tab height
+        <input
+          type="range"
+          min={10}
+          max={42}
+          step={1}
+          value={state.folderTabHeight}
+          onChange={(event) => patchState({ folderTabHeight: Number(event.target.value) })}
+        />
+        <small>{state.folderTabHeight}%</small>
+      </label>
+
+      <div className="grid-two">
+        <label>
+          Width scale
+          <input
+            type="range"
+            min={ICON_SCALE_MIN}
+            max={260}
+            step={2}
+            value={state.widthScale}
+            onChange={(event) => patchState({ widthScale: Number(event.target.value) })}
+          />
+          <small>{(state.widthScale / 100).toFixed(2)}x</small>
+        </label>
+        <label>
+          Height scale
+          <input
+            type="range"
+            min={SHAPE_HEIGHT_SCALE_MIN}
+            max={SHAPE_HEIGHT_SCALE_MAX}
+            step={2}
+            value={state.heightScale}
+            onChange={(event) => patchState({ heightScale: Number(event.target.value) })}
+          />
+          <small>{(state.heightScale / 100).toFixed(2)}x</small>
+        </label>
+      </div>
+
+      <label>
+        Corner rounding
+        <input
+          type="range"
+          min={0}
+          max={SHAPE_RADIUS_MAX}
+          step={2}
+          value={state.radius}
+          onChange={(event) => patchState({ radius: Number(event.target.value) })}
+        />
+        <small>{state.radius}px</small>
+      </label>
+    </>
+  );
+}
+
+function ContentRotationControl({ value, onChange, onReset }) {
+  const canReset = value !== DEFAULT_STATE.contentRotation;
+
+  return (
+    <label>
+      Content rotation
+      <input
+        type="range"
+        min={CONTENT_ROTATION_MIN}
+        max={CONTENT_ROTATION_MAX}
+        step={1}
+        value={value}
+        onChange={(event) => onChange(Number(event.target.value))}
+      />
+      <span className="content-rotation-readout">
+        <small>{value}°</small>
+        {canReset ? (
+          <button
+            type="button"
+            className="btn-ghost content-rotation-reset"
+            onClick={onReset}
+            aria-label="Reset content rotation"
+            title="Reset content rotation"
+          >
+            <RotateCcw size={14} aria-hidden="true" />
+          </button>
+        ) : null}
+      </span>
+    </label>
   );
 }
 
@@ -3575,6 +4477,7 @@ function ImageFace({ iconState, metrics }) {
       style={{
         padding: `${iconState.inset + metrics.visibleOutline}px`,
         opacity: iconState.contentOpacity / 100,
+        transform: `translate(${iconState.contentOffsetX}px, ${iconState.contentOffsetY}px)`,
       }}
     >
       {hasImage && processedImage ? (
@@ -3601,6 +4504,14 @@ function getSectionPreviewShapeMetrics(state) {
       width: 22,
       height: 22,
       borderRadius: clamp(Math.round(state.radius / 6), 6, 11),
+    };
+  }
+
+  if (state.shape === "folder") {
+    return {
+      width: 26,
+      height: 20,
+      borderRadius: clamp(Math.round(state.radius / 8), 3, 9),
     };
   }
 
@@ -3639,7 +4550,9 @@ function ShapeSectionHeaderPreview({ state, className = "" }) {
   const processedImage = useProcessedImageProfile(imageState);
   const shapeMetrics = getSectionPreviewShapeMetrics(state);
   const surfaceStyle =
-    state.shape !== "none" ? getMainSurfaceStyle(state, Math.min(state.outline, 2)) : null;
+    state.shape !== "none" && state.shape !== "folder"
+      ? getMainSurfaceStyle(state, Math.min(state.outline, 2))
+      : null;
 
   return (
     <span
@@ -3649,25 +4562,51 @@ function ShapeSectionHeaderPreview({ state, className = "" }) {
       {state.shape === "none" ? (
         <span className="section-header-preview-none">/</span>
       ) : (
-        <span
-          className="section-header-preview-shape-surface"
-          style={{
-            width: `${shapeMetrics.width}px`,
-            height: `${shapeMetrics.height}px`,
-            borderRadius: `${shapeMetrics.borderRadius}px`,
-            opacity: state.baseOpacity / 100,
-            ...(surfaceStyle || {}),
-          }}
-        >
-          {state.shape === "image" && processedImage ? (
-            <img
-              src={processedImage}
-              alt=""
-              draggable={false}
-              className="section-header-preview-shape-image"
+        state.shape === "folder" ? (
+          <svg
+            className="section-header-preview-folder"
+            viewBox={`0 0 ${shapeMetrics.width} ${shapeMetrics.height}`}
+            width={shapeMetrics.width}
+            height={shapeMetrics.height}
+          >
+            <path
+              d={getFolderPath(
+                shapeMetrics.width,
+                shapeMetrics.height,
+                shapeMetrics.borderRadius,
+                state.folderTabX,
+                state.folderTabWidth,
+                state.folderTabHeight,
+                1,
+              )}
+              fill={state.fillStops[0]}
+              stroke={state.strokeStops[0]}
+              strokeWidth={Math.min(state.outline, 2)}
+              strokeLinejoin="round"
+              opacity={state.baseOpacity / 100}
             />
-          ) : null}
-        </span>
+          </svg>
+        ) : (
+          <span
+            className="section-header-preview-shape-surface"
+            style={{
+              width: `${shapeMetrics.width}px`,
+              height: `${shapeMetrics.height}px`,
+              borderRadius: `${shapeMetrics.borderRadius}px`,
+              opacity: state.baseOpacity / 100,
+              ...(surfaceStyle || {}),
+            }}
+          >
+            {state.shape === "image" && processedImage ? (
+              <img
+                src={processedImage}
+                alt=""
+                draggable={false}
+                className="section-header-preview-shape-image"
+              />
+            ) : null}
+          </span>
+        )
       )}
     </span>
   );
@@ -3710,6 +4649,7 @@ function ContentSectionHeaderPreview({ state }) {
           style={{
             color: state.textColor,
             opacity: state.contentOpacity / 100,
+            transform: `rotate(${state.contentRotation}deg)`,
           }}
         >
           <LucideGlyph
@@ -3726,6 +4666,7 @@ function ContentSectionHeaderPreview({ state }) {
             opacity: state.contentOpacity / 100,
             fontFamily: state.fontFamily,
             fontWeight: state.fontWeight,
+            transform: `rotate(${state.contentRotation}deg)`,
           }}
         >
           {previewText}
@@ -3859,6 +4800,86 @@ function ShapeImageFill({ iconState, metrics }) {
   );
 }
 
+function FolderSurface({ iconState, metrics, variant = "front" }) {
+  const rawId = useId().replace(/:/g, "");
+  const fillId = `folder-fill-${rawId}`;
+  const strokeId = `folder-stroke-${rawId}`;
+  const { width, height } = metrics.dimensions;
+  const strokeWidth = variant === "back" ? 0 : metrics.visibleOutline;
+  const strokeInset = strokeWidth / 2;
+  const fillPaint =
+    variant === "back"
+      ? iconState.backColor
+      : getSvgPaintReference(fillId, iconState.fillStops, DEFAULT_STATE.fillStops);
+  const strokePaint =
+    variant === "back"
+      ? "none"
+      : getSvgPaintReference(strokeId, iconState.strokeStops, DEFAULT_STATE.strokeStops);
+  const baseColor = sanitizeColorStops(iconState.fillStops, DEFAULT_STATE.fillStops)[0];
+  const highlightColor = mixHexColors(baseColor, "#ffffff", 0.2);
+  const opacity = variant === "back" ? (iconState.backDistance > 0 ? 1 : 0) : iconState.baseOpacity / 100;
+  const path = getFolderPath(
+    width,
+    height,
+    metrics.borderRadius,
+    iconState.folderTabX,
+    iconState.folderTabWidth,
+    iconState.folderTabHeight,
+    strokeInset,
+  );
+
+  return (
+    <svg
+      className="folder-surface"
+      viewBox={`0 0 ${width} ${height}`}
+      width={width}
+      height={height}
+      aria-hidden="true"
+      style={{ opacity }}
+    >
+      <defs>
+        {variant !== "back" ? (
+          <>
+            <SvgPaint
+              id={fillId}
+              stops={iconState.fillStops}
+              gradientType={iconState.fillGradientType}
+              angle={iconState.fillGradientAngle}
+              centerX={iconState.fillGradientCenterX}
+              centerY={iconState.fillGradientCenterY}
+              fallback={DEFAULT_STATE.fillStops}
+            />
+            <SvgPaint
+              id={strokeId}
+              stops={iconState.strokeStops}
+              gradientType={iconState.strokeGradientType}
+              angle={iconState.strokeGradientAngle}
+              centerX={iconState.strokeGradientCenterX}
+              centerY={iconState.strokeGradientCenterY}
+              fallback={DEFAULT_STATE.strokeStops}
+            />
+          </>
+        ) : null}
+      </defs>
+      <path
+        d={path}
+        fill={fillPaint}
+        stroke={strokePaint}
+        strokeWidth={strokeWidth}
+        strokeLinejoin="round"
+      />
+      {variant !== "back" ? (
+        <path
+          d={path}
+          fill={highlightColor}
+          opacity="0.18"
+          transform={`translate(0 ${Math.max(2, height * -0.035)})`}
+        />
+      ) : null}
+    </svg>
+  );
+}
+
 function IconFace({ iconState, metrics }) {
   if (!iconState.contentEnabled) {
     return null;
@@ -3876,6 +4897,7 @@ function IconFace({ iconState, metrics }) {
           fontWeight: iconState.fontWeight,
           letterSpacing: `${iconState.spacing}px`,
           padding: `${iconState.inset + metrics.visibleOutline}px`,
+          transform: `translate(calc(-50% + ${iconState.contentOffsetX}px), calc(-50% + ${iconState.contentOffsetY}px)) rotate(${iconState.contentRotation}deg)`,
         }}
       >
         {iconState.content || " "}
@@ -3899,6 +4921,7 @@ function IconFace({ iconState, metrics }) {
         opacity: iconState.contentOpacity / 100,
         width: `${metrics.iconRenderSize}px`,
         height: `${metrics.iconRenderSize}px`,
+        transform: `translate(calc(-50% + ${iconState.contentOffsetX}px), calc(-50% + ${iconState.contentOffsetY}px)) rotate(${iconState.contentRotation}deg)`,
       }}
     >
       <LucideGlyph
@@ -3911,6 +4934,8 @@ function IconFace({ iconState, metrics }) {
 }
 
 function IconLayers({ iconState, metrics, className = "" }) {
+  const isFolder = iconState.shapeEnabled && iconState.shape === "folder";
+
   return (
     <>
       {iconState.shapeEnabled && iconState.backLayerEnabled && iconState.shape !== "none" ? (
@@ -3919,32 +4944,45 @@ function IconLayers({ iconState, metrics, className = "" }) {
           style={{
             width: `${metrics.dimensions.width}px`,
             height: `${metrics.dimensions.height}px`,
-            borderRadius: `${metrics.borderRadius}px`,
-            background: iconState.backColor,
+            borderRadius: isFolder ? 0 : `${metrics.borderRadius}px`,
+            background: isFolder ? "none" : iconState.backColor,
             border: "none",
-            transform: `translate(${metrics.offset.x}px, ${metrics.offset.y}px)`,
+            transform: `translate(${metrics.offset.x + iconState.shapeOffsetX}px, ${
+              metrics.offset.y + iconState.shapeOffsetY
+            }px)`,
             opacity: iconState.backDistance > 0 ? 1 : 0,
           }}
-        />
+        >
+          {isFolder ? <FolderSurface iconState={iconState} metrics={metrics} variant="back" /> : null}
+        </div>
       ) : null}
       <div
-        className={`icon-layer icon-main ${iconState.shapeEnabled && iconState.shape === "image" ? "shape-image" : ""} ${className}`.trim()}
+        className={`icon-layer icon-main ${
+          iconState.shapeEnabled && iconState.shape === "image" ? "shape-image" : ""
+        } ${isFolder ? "folder-base" : ""} ${className}`.trim()}
         style={{
           width: `${metrics.dimensions.width}px`,
           height: `${metrics.dimensions.height}px`,
-          borderRadius: `${metrics.borderRadius}px`,
+          borderRadius: isFolder ? 0 : `${metrics.borderRadius}px`,
         }}
       >
         {iconState.shapeEnabled && iconState.shape !== "none" ? (
           <div
             className="icon-base-surface"
             style={{
-              borderRadius: `${metrics.borderRadius}px`,
-              opacity: iconState.baseOpacity / 100,
-              ...metrics.mainSurfaceStyle,
+              borderRadius: isFolder ? 0 : `${metrics.borderRadius}px`,
+              transform: `translate(${iconState.shapeOffsetX}px, ${iconState.shapeOffsetY}px)`,
+              ...(isFolder
+                ? {}
+                : {
+                    opacity: iconState.baseOpacity / 100,
+                    ...metrics.mainSurfaceStyle,
+                  }),
             }}
           >
-            {iconState.shape === "image" ? (
+            {isFolder ? (
+              <FolderSurface iconState={iconState} metrics={metrics} />
+            ) : iconState.shape === "image" ? (
               <ShapeImageFill iconState={iconState} metrics={metrics} />
             ) : null}
           </div>
@@ -3955,16 +4993,186 @@ function IconLayers({ iconState, metrics, className = "" }) {
   );
 }
 
+function InspectHitTarget({
+  target,
+  highlightedInspectId = "",
+  dragScale = 1,
+  onHighlightInspectPart,
+  onSelectInspectPart,
+  onDragInspectPart,
+  onResizeInspectPart,
+}) {
+  const dragRef = useRef(null);
+  const [isInteracting, setIsInteracting] = useState(false);
+  const isHighlighted = highlightedInspectId === target.id;
+  const isDraggable = target.part === "content" || target.part === "base";
+  const zIndex =
+    target.target.type === "particle"
+      ? target.part === "content"
+        ? 18
+        : target.part === "base"
+          ? 17
+          : 16
+      : target.part === "content"
+        ? 8
+        : target.part === "base"
+          ? 7
+          : 6;
+
+  const startInteraction = (event, mode, handle = "") => {
+    if (!isDraggable) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    dragRef.current = {
+      pointerId: event.pointerId,
+      lastX: event.clientX,
+      lastY: event.clientY,
+      mode,
+      handle,
+      moved: false,
+      captureTarget: event.currentTarget,
+    };
+    onHighlightInspectPart?.(target.id);
+    setIsInteracting(true);
+  };
+
+  const handlePointerMove = (event) => {
+    const active = dragRef.current;
+    if (!active || active.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    const scale = Math.max(0.001, dragScale);
+    const deltaX = (event.clientX - active.lastX) / scale;
+    const deltaY = (event.clientY - active.lastY) / scale;
+    if (Math.abs(deltaX) < 0.01 && Math.abs(deltaY) < 0.01) return;
+    active.lastX = event.clientX;
+    active.lastY = event.clientY;
+    active.moved = true;
+
+    if (active.mode === "resize") {
+      onResizeInspectPart?.(target, active.handle, deltaX, deltaY, event.shiftKey);
+      return;
+    }
+
+    onDragInspectPart?.(target, deltaX, deltaY);
+  };
+
+  const finishInteraction = (event) => {
+    const active = dragRef.current;
+    if (active?.pointerId === event.pointerId) {
+      active.captureTarget?.releasePointerCapture?.(event.pointerId);
+      if (active.mode === "move" && !active.moved) {
+        onSelectInspectPart?.(target);
+        dragRef.current = { ...active, ended: true, moved: true };
+      } else {
+        dragRef.current = { ...active, ended: true };
+      }
+    }
+    setIsInteracting(false);
+  };
+
+  const handleResizePointerDown = (handle) => (event) => {
+    startInteraction(event, "resize", handle);
+  };
+
+  return (
+    <button
+      type="button"
+      className={[
+        "inspect-hit-target",
+        isDraggable ? "draggable" : "",
+        isHighlighted ? "highlighted" : "",
+        isInteracting ? "interacting" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+      style={{
+        left: `${target.bounds.left}px`,
+        top: `${target.bounds.top}px`,
+        width: `${target.bounds.width}px`,
+        height: `${target.bounds.height}px`,
+        borderRadius: `${target.bounds.radius}px`,
+        zIndex,
+      }}
+      onMouseEnter={() => onHighlightInspectPart?.(target.id)}
+      onMouseLeave={() => onHighlightInspectPart?.("")}
+      onFocus={() => onHighlightInspectPart?.(target.id)}
+      onBlur={() => onHighlightInspectPart?.("")}
+      onPointerDown={
+        isDraggable
+          ? (event) => startInteraction(event, "move")
+          : undefined
+      }
+      onPointerMove={isDraggable ? handlePointerMove : undefined}
+      onPointerUp={isDraggable ? finishInteraction : undefined}
+      onPointerCancel={
+        isDraggable
+            ? (event) => {
+              const active = dragRef.current;
+              if (active?.pointerId === event.pointerId) {
+                active.captureTarget?.releasePointerCapture?.(event.pointerId);
+                dragRef.current = null;
+              }
+              setIsInteracting(false);
+            }
+          : undefined
+      }
+      onClick={(event) => {
+        event.stopPropagation();
+        if (dragRef.current?.moved) {
+          dragRef.current = null;
+          return;
+        }
+        onSelectInspectPart?.(target);
+      }}
+      aria-label={`Edit ${target.label}`}
+    >
+      <span className="inspect-hit-label">{target.label}</span>
+      {isDraggable ? (
+        <>
+          <span
+            className="inspect-drag-handle handle-nw"
+            aria-hidden="true"
+            onPointerDown={handleResizePointerDown("nw")}
+          />
+          <span
+            className="inspect-drag-handle handle-ne"
+            aria-hidden="true"
+            onPointerDown={handleResizePointerDown("ne")}
+          />
+          <span
+            className="inspect-drag-handle handle-se"
+            aria-hidden="true"
+            onPointerDown={handleResizePointerDown("se")}
+          />
+          <span
+            className="inspect-drag-handle handle-sw"
+            aria-hidden="true"
+            onPointerDown={handleResizePointerDown("sw")}
+          />
+        </>
+      ) : null}
+    </button>
+  );
+}
+
 function CompositeIconStack({
   baseState,
   particles = {},
   editorTarget = { type: "base" },
   className = "",
   interactive = false,
+  inspectMode = false,
+  highlightedInspectId = "",
+  inspectDragScale = 1,
   showCornerHotspots = false,
   onSelectBase,
   onSelectParticle,
   onCornerAdd,
+  onHighlightInspectPart,
+  onSelectInspectPart,
+  onDragInspectPart,
+  onResizeInspectPart,
 }) {
   const baseMetrics = useMemo(() => getIconMetrics(baseState), [baseState]);
   const particleLayers = useMemo(
@@ -3972,6 +5180,10 @@ function CompositeIconStack({
     [baseMetrics, particles],
   );
   const cornerPoints = useMemo(() => buildCornerPoints(baseMetrics), [baseMetrics]);
+  const baseInspectTargets = useMemo(
+    () => buildInspectTargetsForIcon({ type: "base" }, baseState, baseMetrics),
+    [baseState, baseMetrics],
+  );
 
   return (
     <div
@@ -3985,94 +5197,128 @@ function CompositeIconStack({
       onClick={interactive ? onSelectBase : undefined}
     >
       <IconLayers iconState={baseState} metrics={baseMetrics} />
+      {inspectMode
+        ? baseInspectTargets.map((target) => (
+            <InspectHitTarget
+              key={target.id}
+              target={target}
+              highlightedInspectId={highlightedInspectId}
+              dragScale={inspectDragScale}
+              onHighlightInspectPart={onHighlightInspectPart}
+              onSelectInspectPart={onSelectInspectPart}
+              onDragInspectPart={onDragInspectPart}
+              onResizeInspectPart={onResizeInspectPart}
+            />
+          ))
+        : null}
 
-      {particleLayers.map((layer) => (
-        <div
-          key={layer.key}
-          className={`particle-layer ${interactive ? "interactive" : ""} ${
-            editorTarget.type === "particle" && editorTarget.corner === layer.key
-              ? "editing-target"
-              : ""
-          }`}
-          style={{
-            left: `${layer.placement.left}px`,
-            top: `${layer.placement.top}px`,
-            width: `${layer.metrics.dimensions.width}px`,
-            height: `${layer.metrics.dimensions.height}px`,
-          }}
-          onClick={
-            interactive && onSelectParticle
-              ? (event) => {
-                  event.stopPropagation();
-                  onSelectParticle(layer.key);
-                }
-              : undefined
-          }
-          role={interactive ? "button" : undefined}
-          tabIndex={interactive ? 0 : undefined}
-          onKeyDown={
-            interactive && onSelectParticle
-              ? (event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    onSelectParticle(layer.key);
-                  }
-                }
-              : undefined
-          }
-          aria-label={interactive ? `Edit ${layer.label} particle` : undefined}
-        >
+      {particleLayers.map((layer) => {
+        const visualBounds = getIconVisualBounds(layer.particle.icon, layer.metrics);
+        const focusPadding = 10;
+        const focusWidth = Math.max(1, visualBounds.maxX - visualBounds.minX + focusPadding * 2);
+        const focusHeight = Math.max(1, visualBounds.maxY - visualBounds.minY + focusPadding * 2);
+        const focusRadius = Math.min(
+          layer.metrics.borderRadius + focusPadding,
+          focusWidth / 2,
+          focusHeight / 2,
+        );
+
+        return (
           <div
-            className="icon-stack particle-stack"
+            key={layer.key}
+            className={`particle-layer ${interactive ? "interactive" : ""} ${
+              editorTarget.type === "particle" && editorTarget.corner === layer.key
+                ? "editing-target"
+                : ""
+            }`}
             style={{
+              left: `${layer.placement.left}px`,
+              top: `${layer.placement.top}px`,
               width: `${layer.metrics.dimensions.width}px`,
               height: `${layer.metrics.dimensions.height}px`,
             }}
+            onClick={
+              interactive && onSelectParticle
+                ? (event) => {
+                    event.stopPropagation();
+                    onSelectParticle(layer.key);
+                  }
+                : undefined
+            }
+            role={interactive ? "button" : undefined}
+            tabIndex={interactive ? 0 : undefined}
+            onKeyDown={
+              interactive && onSelectParticle
+                ? (event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      onSelectParticle(layer.key);
+                    }
+                  }
+                : undefined
+            }
+            aria-label={interactive ? `Edit ${layer.label} particle` : undefined}
           >
-            <IconLayers iconState={layer.particle.icon} metrics={layer.metrics} />
-          </div>
-          {interactive &&
-          editorTarget.type === "particle" &&
-          editorTarget.corner === layer.key ? (
             <div
-              className="particle-focus-ring"
+              className="icon-stack particle-stack"
               style={{
-                width: `${layer.metrics.dimensions.width + 20}px`,
-                height: `${layer.metrics.dimensions.height + 20}px`,
-                left: "-10px",
-                top: "-10px",
+                width: `${layer.metrics.dimensions.width}px`,
+                height: `${layer.metrics.dimensions.height}px`,
               }}
             >
-              <svg
-                viewBox={`0 0 ${layer.metrics.dimensions.width + 20} ${
-                  layer.metrics.dimensions.height + 20
-                }`}
-                preserveAspectRatio="none"
-                aria-hidden="true"
-              >
-                <rect
-                  className="particle-focus-ring-path"
-                  x="1"
-                  y="1"
-                  width={Math.max(1, layer.metrics.dimensions.width + 18)}
-                  height={Math.max(1, layer.metrics.dimensions.height + 18)}
-                  rx={Math.min(
-                    layer.metrics.borderRadius + 10,
-                    (layer.metrics.dimensions.width + 18) / 2,
-                    (layer.metrics.dimensions.height + 18) / 2,
-                  )}
-                  ry={Math.min(
-                    layer.metrics.borderRadius + 10,
-                    (layer.metrics.dimensions.width + 18) / 2,
-                    (layer.metrics.dimensions.height + 18) / 2,
-                  )}
-                />
-              </svg>
+              <IconLayers iconState={layer.particle.icon} metrics={layer.metrics} />
             </div>
-          ) : null}
-        </div>
-      ))}
+            {inspectMode
+              ? buildInspectTargetsForIcon(
+                  { type: "particle", corner: layer.key },
+                  layer.particle.icon,
+                  layer.metrics,
+                ).map((target) => (
+                  <InspectHitTarget
+                    key={target.id}
+                    target={target}
+                    highlightedInspectId={highlightedInspectId}
+                    dragScale={inspectDragScale}
+                    onHighlightInspectPart={onHighlightInspectPart}
+                    onSelectInspectPart={onSelectInspectPart}
+                    onDragInspectPart={onDragInspectPart}
+                    onResizeInspectPart={onResizeInspectPart}
+                  />
+                ))
+              : null}
+            {interactive &&
+            editorTarget.type === "particle" &&
+            editorTarget.corner === layer.key ? (
+              <div
+                className="particle-focus-ring"
+                style={{
+                  width: `${focusWidth}px`,
+                  height: `${focusHeight}px`,
+                  left: `${visualBounds.minX - focusPadding}px`,
+                  top: `${visualBounds.minY - focusPadding}px`,
+                }}
+              >
+                <svg
+                  viewBox={`0 0 ${focusWidth} ${focusHeight}`}
+                  preserveAspectRatio="none"
+                  aria-hidden="true"
+                >
+                  <rect
+                    className="particle-focus-ring-path"
+                    x="1"
+                    y="1"
+                    width={Math.max(1, focusWidth - 2)}
+                    height={Math.max(1, focusHeight - 2)}
+                    rx={focusRadius}
+                    ry={focusRadius}
+                  />
+                </svg>
+              </div>
+            ) : null}
+          </div>
+        );
+      })}
 
       {showCornerHotspots
         ? cornerPoints
@@ -4119,8 +5365,8 @@ function StaticCompositionPreview({
     [baseMetrics, particles],
   );
   const bounds = useMemo(
-    () => getCompositeBounds(baseMetrics, particleLayers),
-    [baseMetrics, particleLayers],
+    () => getCompositeBounds(baseState, baseMetrics, particleLayers),
+    [baseState, baseMetrics, particleLayers],
   );
   const innerTargetSize = Math.max(16, targetSize - padding * 2);
   const scale = useMemo(() => getContextScale(innerTargetSize, bounds), [innerTargetSize, bounds]);
@@ -4784,6 +6030,15 @@ function App() {
   const [toast, setToast] = useState("");
   const [isShareOpen, setShareOpen] = useState(false);
   const [isInfoOpen, setInfoOpen] = useState(false);
+  const [isSpecOpen, setSpecOpen] = useState(false);
+  const [hasOpenedSpecModal, setHasOpenedSpecModal] = useState(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      return window.localStorage.getItem("iquan-spec-modal-opened") === "true";
+    } catch {
+      return false;
+    }
+  });
   const [isIconPickerOpen, setIconPickerOpen] = useState(false);
   const [isFontPickerOpen, setFontPickerOpen] = useState(false);
   const [isContentSectionOpen, setContentSectionOpen] = useState(true);
@@ -4796,6 +6051,8 @@ function App() {
   const [exportScale, setExportScale] = useState(DEFAULT_EXPORT_SCALE);
   const [useImportedImageExportSize, setUseImportedImageExportSize] = useState(false);
   const [cursorTooltip, setCursorTooltip] = useState(null);
+  const [isSelectMenuOpen, setSelectMenuOpen] = useState(false);
+  const [highlightedInspectId, setHighlightedInspectId] = useState("");
   const [previewContextMode, setPreviewContextMode] = useState(DEFAULT_PREVIEW_CONTEXT_MODE);
   const [imageCropState, setImageCropState] = useState(() => createDefaultImageCropState());
   const [canUndo, setCanUndo] = useState(false);
@@ -4806,6 +6063,15 @@ function App() {
   const [uiPhase, setUiPhase] = useState(() =>
     pageMode === "copiedLink" ? "builder" : "landing",
   );
+  const [workspaceMode, setWorkspaceMode] = useState(() => {
+    if (pageMode === "copiedLink" || typeof window === "undefined") return "editor";
+    return resolveWorkspaceModeFromUrl(new URL(window.location.href));
+  });
+  const [wizardStepIndex, setWizardStepIndex] = useState(0);
+  const [walkthroughRequested, setWalkthroughRequested] = useState(false);
+  const [isWalkthroughActive, setWalkthroughActive] = useState(false);
+  const [walkthroughStepIndex, setWalkthroughStepIndex] = useState(0);
+  const [walkthroughTargetRect, setWalkthroughTargetRect] = useState(null);
   const [heroSamples, setHeroSamples] = useState(() => createInitialHeroSamples());
 
   const exportRef = useRef(null);
@@ -4883,11 +6149,34 @@ function App() {
               : "";
   const activeMetrics = useMemo(() => getIconMetrics(state), [state]);
   const baseMetrics = useMemo(() => getIconMetrics(baseState), [baseState]);
+  const linkedTextContentScaleLimit = useMemo(
+    () => getLinkedTextContentScaleLimit(state, state.outline),
+    [state],
+  );
+  const baseLinkedTextContentScaleLimit = useMemo(
+    () => getLinkedTextContentScaleLimit(baseState, baseState.outline),
+    [baseState],
+  );
+  const contentScaleMax =
+    linkedTextContentScaleLimit === null
+      ? ICON_SCALE_MAX
+      : Math.max(state.iconScale, linkedTextContentScaleLimit);
+  const baseContentScaleMax =
+    baseLinkedTextContentScaleLimit === null
+      ? ICON_SCALE_MAX
+      : Math.max(baseState.iconScale, baseLinkedTextContentScaleLimit);
   const isTextScaleCappedByLink = useMemo(() => {
-    if (state.mode !== "text" || !state.linkTextToSize) return false;
-    const requestedSize = Math.max(8, Math.round(state.fontSize));
-    return activeMetrics.fittedFontSize >= requestedSize;
-  }, [state.mode, state.linkTextToSize, state.fontSize, activeMetrics.fittedFontSize]);
+    return (
+      linkedTextContentScaleLimit !== null &&
+      state.iconScale >= linkedTextContentScaleLimit
+    );
+  }, [state.iconScale, linkedTextContentScaleLimit]);
+  const isBaseTextScaleCappedByLink = useMemo(() => {
+    return (
+      baseLinkedTextContentScaleLimit !== null &&
+      baseState.iconScale >= baseLinkedTextContentScaleLimit
+    );
+  }, [baseState.iconScale, baseLinkedTextContentScaleLimit]);
   const selectedFontLabel = useMemo(() => {
     const selected = FONT_OPTIONS.find((font) => font.value === state.fontFamily);
     return selected ? selected.label : state.fontFamily;
@@ -4906,7 +6195,7 @@ function App() {
     [baseState, particles, canvasSize],
   );
   const editorShareUrl = useMemo(
-    () => createShareUrl(urlSafeShareCode, { destination: "editor" }),
+    () => createShareUrl(urlSafeShareCode, { destination: "editor", view: "editor" }),
     [urlSafeShareCode],
   );
   const copiedLinkShareUrl = useMemo(
@@ -4925,6 +6214,19 @@ function App() {
     () => buildParticleLayers(baseMetrics, particles),
     [baseMetrics, particles],
   );
+  const inspectTargets = useMemo(
+    () => [
+      ...buildInspectTargetsForIcon({ type: "base" }, baseState, baseMetrics),
+      ...particleLayers.flatMap((layer) =>
+        buildInspectTargetsForIcon(
+          { type: "particle", corner: layer.key },
+          layer.particle.icon,
+          layer.metrics,
+        ),
+      ),
+    ],
+    [baseState, baseMetrics, particleLayers],
+  );
 
   const selectedParticleLayer = isEditingParticle
     ? particleLayers.find((layer) => layer.key === editorTarget.corner) || null
@@ -4934,15 +6236,23 @@ function App() {
     if (!selectedParticleLayer) return { x: 0, y: 0 };
     const baseCenterX = baseMetrics.dimensions.width / 2;
     const baseCenterY = baseMetrics.dimensions.height / 2;
+    const visualBounds = getIconVisualBounds(
+      selectedParticleLayer.particle.icon,
+      selectedParticleLayer.metrics,
+    );
+    const particleCenterX =
+      selectedParticleLayer.placement.left + (visualBounds.minX + visualBounds.maxX) / 2;
+    const particleCenterY =
+      selectedParticleLayer.placement.top + (visualBounds.minY + visualBounds.maxY) / 2;
     return {
-      x: (baseCenterX - selectedParticleLayer.placement.centerX) * 0.5,
-      y: (baseCenterY - selectedParticleLayer.placement.centerY) * 0.5,
+      x: (baseCenterX - particleCenterX) * 0.5,
+      y: (baseCenterY - particleCenterY) * 0.5,
     };
   }, [selectedParticleLayer, baseMetrics.dimensions.width, baseMetrics.dimensions.height]);
 
   const compositeBounds = useMemo(
-    () => getCompositeBounds(baseMetrics, particleLayers),
-    [baseMetrics, particleLayers],
+    () => getCompositeBounds(baseState, baseMetrics, particleLayers),
+    [baseState, baseMetrics, particleLayers],
   );
   const preferredImageExportDimensions = useMemo(() => {
     const candidates = [];
@@ -5032,12 +6342,101 @@ function App() {
       ? `Square canvas: ${exportPixelWidth} x ${exportPixelHeight} at ${exportScale}x`
       : `${exportPixelWidth} x ${exportPixelHeight}`;
   const isHeroVisible = pageMode !== "copiedLink" && uiPhase !== "builder";
+  const isWizardWorkspaceMode = workspaceMode === "wizard";
+  const appHeaderTitleContent = <span className="app-header-brand">Iquan</span>;
+  const specButtonClass =
+    hasOpenedSpecModal || isSpecOpen
+      ? "app-header-spec"
+      : "app-header-spec app-header-spec-needs-attention";
+  const wizardStep = WIZARD_STEPS[wizardStepIndex] || WIZARD_STEPS[0];
+  const wizardStepNumber = wizardStepIndex + 1;
+  const canGoBackInWizard = wizardStepIndex > 0;
+  const canGoForwardInWizard = wizardStepIndex < WIZARD_STEPS.length - 1;
+  const walkthroughStep =
+    WIZARD_WALKTHROUGH_STEPS[walkthroughStepIndex] || WIZARD_WALKTHROUGH_STEPS[0];
+  const walkthroughStepNumber = walkthroughStepIndex + 1;
+  const canGoForwardInWalkthrough =
+    walkthroughStepIndex < WIZARD_WALKTHROUGH_STEPS.length - 1;
+  const walkthroughCardPosition = getWalkthroughCardPosition(walkthroughTargetRect);
 
   useEffect(() => {
     if (!toast) return undefined;
     const timer = window.setTimeout(() => setToast(""), 1600);
     return () => window.clearTimeout(timer);
   }, [toast]);
+
+  useEffect(() => {
+    if (!isWalkthroughActive || !walkthroughStep) return;
+
+    setWorkspaceMode("wizard");
+
+    const nextWizardStepIndex = WIZARD_STEPS.findIndex(
+      (step) => step.id === walkthroughStep.wizardStepId,
+    );
+    if (nextWizardStepIndex >= 0 && nextWizardStepIndex !== wizardStepIndex) {
+      setWizardStepIndex(nextWizardStepIndex);
+    }
+
+    controlsRef.current?.scrollTo({ top: 0, left: 0, behavior: "smooth" });
+  }, [isWalkthroughActive, walkthroughStep, wizardStepIndex]);
+
+  useEffect(() => {
+    if (!isWalkthroughActive || !walkthroughStep) {
+      setWalkthroughTargetRect(null);
+      return undefined;
+    }
+
+    let frameId = 0;
+    const updateTargetRect = () => {
+      const target = document.querySelector(
+        `[data-walkthrough-target="${walkthroughStep.target}"]`,
+      );
+
+      if (!target) {
+        setWalkthroughTargetRect(null);
+        return;
+      }
+
+      const rect = target.getBoundingClientRect();
+      setWalkthroughTargetRect((current) => {
+        if (
+          current &&
+          Math.abs(current.top - rect.top) < 1 &&
+          Math.abs(current.left - rect.left) < 1 &&
+          Math.abs(current.width - rect.width) < 1 &&
+          Math.abs(current.height - rect.height) < 1
+        ) {
+          return current;
+        }
+
+        return {
+          top: rect.top,
+          left: rect.left,
+          right: rect.right,
+          bottom: rect.bottom,
+          width: rect.width,
+          height: rect.height,
+        };
+      });
+    };
+
+    const scheduleTargetRectUpdate = () => {
+      window.cancelAnimationFrame(frameId);
+      frameId = window.requestAnimationFrame(updateTargetRect);
+    };
+
+    scheduleTargetRectUpdate();
+    const intervalId = window.setInterval(updateTargetRect, 180);
+    window.addEventListener("resize", scheduleTargetRectUpdate);
+    window.addEventListener("scroll", scheduleTargetRectUpdate, true);
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      window.clearInterval(intervalId);
+      window.removeEventListener("resize", scheduleTargetRectUpdate);
+      window.removeEventListener("scroll", scheduleTargetRectUpdate, true);
+    };
+  }, [isWalkthroughActive, walkthroughStep, wizardStepIndex, previewContextMode]);
 
   useEffect(() => {
     if (pageMode === "copiedLink" || uiPhase !== "landing") return undefined;
@@ -5114,11 +6513,14 @@ function App() {
     ) {
       return;
     }
-    const nextUrl = createShareUrl(urlSafeShareCode, { destination: pageMode });
+    const nextUrl = createShareUrl(urlSafeShareCode, {
+      destination: pageMode,
+      view: pageMode === "editor" && workspaceMode === "editor" ? "editor" : undefined,
+    });
     if (nextUrl !== window.location.href) {
       window.history.replaceState(null, "", nextUrl);
     }
-  }, [pageMode, sharePageStatus, urlSafeShareCode]);
+  }, [pageMode, sharePageStatus, urlSafeShareCode, workspaceMode]);
 
   useEffect(() => {
     if (editorTarget.type !== "particle") return;
@@ -5177,10 +6579,17 @@ function App() {
     const handleKeyDown = (event) => {
       if (event.key === "Escape") {
         setShareOpen(false);
+        setInfoOpen(false);
+        setSpecOpen(false);
         setIconPickerOpen(false);
         setFontPickerOpen(false);
+        setSelectMenuOpen(false);
+        setHighlightedInspectId("");
         setImageCropState((current) => ({ ...current, open: false }));
         setCursorTooltip(null);
+        setWalkthroughActive(false);
+        setWalkthroughRequested(false);
+        setWalkthroughTargetRect(null);
         return;
       }
 
@@ -5217,9 +6626,55 @@ function App() {
     };
   }, []);
 
+  const startWizardWalkthrough = () => {
+    setWalkthroughRequested(true);
+    setWalkthroughTargetRect(null);
+    setWalkthroughStepIndex(0);
+    setWizardStepIndex(0);
+    setWorkspaceMode("wizard");
+    setWalkthroughActive(true);
+  };
+
+  const handleWalkthroughSkip = () => {
+    setWalkthroughActive(false);
+    setWalkthroughRequested(false);
+    setWalkthroughTargetRect(null);
+  };
+
+  const handleWalkthroughFinish = () => {
+    setWalkthroughActive(false);
+    setWalkthroughRequested(false);
+    setWalkthroughTargetRect(null);
+    setWalkthroughStepIndex(0);
+    setWizardStepIndex(0);
+    controlsRef.current?.scrollTo({ top: 0, left: 0, behavior: "smooth" });
+  };
+
+  const handleWalkthroughNext = () => {
+    if (!canGoForwardInWalkthrough) {
+      handleWalkthroughFinish();
+      return;
+    }
+
+    const nextIndex = walkthroughStepIndex + 1;
+    const nextStep = WIZARD_WALKTHROUGH_STEPS[nextIndex];
+    const nextWizardStepIndex = WIZARD_STEPS.findIndex(
+      (step) => step.id === nextStep.wizardStepId,
+    );
+
+    setWalkthroughTargetRect(null);
+    setWalkthroughStepIndex(nextIndex);
+    if (nextWizardStepIndex >= 0) {
+      setWizardStepIndex(nextWizardStepIndex);
+    }
+  };
+
   const handleStartBuilder = () => {
     if (uiPhase !== "landing") return;
 
+    setWorkspaceMode("wizard");
+    setWizardStepIndex(0);
+    setWalkthroughStepIndex(0);
     setUiPhase("transitioning");
     if (heroTransitionTimerRef.current) {
       window.clearTimeout(heroTransitionTimerRef.current);
@@ -5227,8 +6682,25 @@ function App() {
 
     heroTransitionTimerRef.current = window.setTimeout(() => {
       setUiPhase("builder");
+      if (walkthroughRequested) {
+        startWizardWalkthrough();
+      }
       heroTransitionTimerRef.current = null;
     }, LANDING_TO_BUILDER_MS);
+  };
+
+  const handleWalkthroughToggle = (event) => {
+    const checked = event.currentTarget.checked;
+    setWalkthroughRequested(checked);
+    if (!checked) {
+      setWalkthroughActive(false);
+      setWalkthroughTargetRect(null);
+      return;
+    }
+
+    if (!isHeroVisible && isWizardWorkspaceMode) {
+      startWizardWalkthrough();
+    }
   };
 
   const handleReturnToLanding = () => {
@@ -5241,14 +6713,66 @@ function App() {
       controlsRef.current.scrollLeft = 0;
     }
     setEditorTarget({ type: "base" });
+    setWorkspaceMode("wizard");
+    setWizardStepIndex(0);
     setPreviewContextMode(DEFAULT_PREVIEW_CONTEXT_MODE);
     setInfoOpen(false);
+    setSpecOpen(false);
     setShareOpen(false);
     setIconPickerOpen(false);
     setFontPickerOpen(false);
+    setSelectMenuOpen(false);
+    setHighlightedInspectId("");
     setImageCropState((current) => ({ ...current, open: false }));
     setCursorTooltip(null);
+    setWalkthroughActive(false);
+    setWalkthroughTargetRect(null);
     setUiPhase("landing");
+  };
+
+  const handleOpenEditor = () => {
+    if (controlsRef.current) {
+      controlsRef.current.scrollTop = 0;
+      controlsRef.current.scrollLeft = 0;
+    }
+    setWalkthroughActive(false);
+    setWalkthroughTargetRect(null);
+    setWorkspaceMode("editor");
+    setUiPhase("builder");
+  };
+
+  const handleOpenLandingImport = () => {
+    setLoadCode("");
+    setShareOpen(true);
+  };
+
+  const handleOpenWizard = () => {
+    if (controlsRef.current) {
+      controlsRef.current.scrollTop = 0;
+      controlsRef.current.scrollLeft = 0;
+    }
+    setEditorTarget({ type: "base" });
+    setWorkspaceMode("wizard");
+    setUiPhase("builder");
+    if (walkthroughRequested) {
+      startWizardWalkthrough();
+    }
+  };
+
+  const handleWizardBack = () => {
+    setWizardStepIndex((index) => Math.max(0, index - 1));
+    controlsRef.current?.scrollTo({ top: 0, left: 0, behavior: "smooth" });
+  };
+
+  const handleWizardNext = () => {
+    setWizardStepIndex((index) => Math.min(WIZARD_STEPS.length - 1, index + 1));
+    controlsRef.current?.scrollTo({ top: 0, left: 0, behavior: "smooth" });
+  };
+
+  const handleWizardParticleAdd = (cornerKey) => {
+    handleCornerAddOrSelect(cornerKey);
+    setWorkspaceMode("editor");
+    setUiPhase("builder");
   };
 
   const updateActiveState = (updater) => {
@@ -5273,6 +6797,20 @@ function App() {
 
   const patchState = (patch) => {
     updateActiveState((current) => ({ ...current, ...patch }));
+  };
+
+  const handleShapeModeChange = (shapeMode) => {
+    if (shapeMode === "folder") {
+      patchState({
+        shape: "folder",
+        widthScale: state.shape === "folder" ? state.widthScale : 140,
+        heightScale: state.shape === "folder" ? state.heightScale : 96,
+        radius: state.shape === "folder" ? state.radius : 18,
+      });
+      return;
+    }
+
+    patchState({ shape: shapeMode === "shape" ? "shape" : shapeMode });
   };
 
   const handleContentSectionEnabledChange = (enabled) => {
@@ -5350,22 +6888,60 @@ function App() {
     let shouldOpenTextSizingControls = false;
     updateActiveState((current) => {
       const clampedScale = clamp(nextScale, ICON_SCALE_MIN, ICON_SCALE_MAX);
-      if (clampedScale === current.iconScale) return current;
+      const nextIconScale = resolveIconScaleForStateChange(current, nextScale);
 
-      if (current.mode === "text" && current.linkTextToSize && clampedScale > current.iconScale) {
-        const requestedSize = Math.max(8, Math.round(current.fontSize));
-        const fittedSize = fitTextSize(current, current.outline);
-        if (fittedSize >= requestedSize) {
-          shouldOpenTextSizingControls = true;
-        }
+      if (nextIconScale < clampedScale) {
+        shouldOpenTextSizingControls = true;
       }
 
-      return { ...current, iconScale: clampedScale };
+      if (nextIconScale === current.iconScale) return current;
+
+      return { ...current, iconScale: nextIconScale };
     });
 
     if (shouldOpenTextSizingControls) {
       setContentAdvancedOpen(true);
     }
+  };
+
+  const handleContentZoneChange = (contentOffsetX, contentOffsetY) => {
+    patchState({
+      contentOffsetX,
+      contentOffsetY,
+    });
+  };
+
+  const handleResetContentZone = () => {
+    patchState({
+      contentOffsetX: DEFAULT_STATE.contentOffsetX,
+      contentOffsetY: DEFAULT_STATE.contentOffsetY,
+    });
+  };
+
+  const handleCenterContentToBase = () => {
+    updateActiveState((current) => ({
+      ...current,
+      contentOffsetX: clamp(current.shapeOffsetX, -PART_OFFSET_LIMIT, PART_OFFSET_LIMIT),
+      contentOffsetY: clamp(current.shapeOffsetY, -PART_OFFSET_LIMIT, PART_OFFSET_LIMIT),
+    }));
+  };
+
+  const handleCenterBaseToIcon = () => {
+    updateActiveState((current) => ({
+      ...current,
+      contentOffsetX: clamp(
+        current.contentOffsetX - current.shapeOffsetX,
+        -PART_OFFSET_LIMIT,
+        PART_OFFSET_LIMIT,
+      ),
+      contentOffsetY: clamp(
+        current.contentOffsetY - current.shapeOffsetY,
+        -PART_OFFSET_LIMIT,
+        PART_OFFSET_LIMIT,
+      ),
+      shapeOffsetX: DEFAULT_STATE.shapeOffsetX,
+      shapeOffsetY: DEFAULT_STATE.shapeOffsetY,
+    }));
   };
 
   const copyToClipboard = async (value, successMessage) => {
@@ -5375,6 +6951,32 @@ function App() {
     } catch {
       setToast("Clipboard access blocked");
     }
+  };
+
+  const handleOpenSpecModal = () => {
+    setHasOpenedSpecModal(true);
+    try {
+      window.localStorage.setItem("iquan-spec-modal-opened", "true");
+    } catch {
+      // Ignore storage failures; the in-memory state still stops the prompt for this session.
+    }
+    setInfoOpen(false);
+    setSpecOpen(true);
+  };
+
+  const handleDownloadIquanSpec = () => {
+    const blob = new Blob([iquanSpecMarkdown], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "IQUAN_SPEC.md";
+    link.click();
+    URL.revokeObjectURL(url);
+    setToast("IQUAN_SPEC.md downloaded");
+  };
+
+  const handleCopyIquanSpec = () => {
+    copyToClipboard(iquanSpecMarkdown, "IQUAN_SPEC.md copied");
   };
 
   const handleCopyShareLink = () => {
@@ -5446,6 +7048,11 @@ function App() {
         loadCode: isProjectFile ? encodeState(next.base, next.particles, next.canvasSize) : resolveShareCodeInput(trimmed),
         toast: isProjectFile ? "Project loaded" : "Code loaded",
       });
+      if (uiPhase === "landing") {
+        setWorkspaceMode("wizard");
+        setWizardStepIndex(0);
+        setUiPhase("builder");
+      }
     } catch (error) {
       setToast(error.message || "Invalid code");
     }
@@ -5746,12 +7353,12 @@ function App() {
       const targetParticle = current[cornerKey];
       if (!targetParticle) return current;
       const safeOffsetX = clamp(
-        parseIntOr(nextOffsetX, targetParticle.offsetX),
+        parseFloatOr(nextOffsetX, targetParticle.offsetX),
         -PARTICLE_OFFSET_LIMIT,
         PARTICLE_OFFSET_LIMIT,
       );
       const safeOffsetY = clamp(
-        parseIntOr(nextOffsetY, targetParticle.offsetY),
+        parseFloatOr(nextOffsetY, targetParticle.offsetY),
         -PARTICLE_OFFSET_LIMIT,
         PARTICLE_OFFSET_LIMIT,
       );
@@ -5787,6 +7394,8 @@ function App() {
     setInfoOpen(false);
     setIconPickerOpen(false);
     setFontPickerOpen(false);
+    setSelectMenuOpen(false);
+    setHighlightedInspectId("");
     setContentAdvancedOpen(false);
     setShapeAdvancedOpen(false);
     setBackDistanceLocked(false);
@@ -5795,6 +7404,8 @@ function App() {
     setPreviewContextMode(DEFAULT_PREVIEW_CONTEXT_MODE);
     setCursorTooltip(null);
     setImageCropState(createDefaultImageCropState());
+    setWorkspaceMode("wizard");
+    setWizardStepIndex(0);
     setToast("Everything reset");
   };
 
@@ -5804,6 +7415,8 @@ function App() {
     setParticles(sanitizeParticlesMap(template.particles, nextBase));
     setCanvasSize(template.canvasSize || DEFAULT_CANVAS_SIZE);
     setEditorTarget({ type: "base" });
+    setWorkspaceMode("wizard");
+    setWizardStepIndex(0);
     setUiPhase("builder");
     setToast(`${template.title} template loaded`);
   };
@@ -5837,6 +7450,179 @@ function App() {
     if (!particles[cornerKey]) return;
     setEditorTarget({ type: "particle", corner: cornerKey });
     setToast(`Editing ${getCornerLabel(cornerKey)} particle`);
+  };
+
+  const patchInspectTargetIcon = (selection, patcher) => {
+    if (selection.target.type === "particle") {
+      setParticles((current) => {
+        const targetParticle = current[selection.target.corner];
+        if (!targetParticle) return current;
+        return {
+          ...current,
+          [selection.target.corner]: {
+            ...targetParticle,
+            icon: sanitizeIconState({
+              ...targetParticle.icon,
+              ...patcher(targetParticle.icon),
+            }),
+          },
+        };
+      });
+      return;
+    }
+
+    setBaseState((current) =>
+      sanitizeIconState({
+        ...current,
+        ...patcher(current),
+      }),
+    );
+  };
+
+  const handleDragInspectPart = (selection, deltaX, deltaY) => {
+    if (!selection || (selection.part !== "content" && selection.part !== "base")) return;
+    setHighlightedInspectId(selection.id);
+
+    if (selection.target.type === "particle" && selection.part === "base") {
+      setParticles((current) => {
+        const targetParticle = current[selection.target.corner];
+        if (!targetParticle) return current;
+        return {
+          ...current,
+          [selection.target.corner]: {
+            ...targetParticle,
+            offsetX: clamp(targetParticle.offsetX + deltaX, -PARTICLE_OFFSET_LIMIT, PARTICLE_OFFSET_LIMIT),
+            offsetY: clamp(targetParticle.offsetY + deltaY, -PARTICLE_OFFSET_LIMIT, PARTICLE_OFFSET_LIMIT),
+          },
+        };
+      });
+      return;
+    }
+
+    patchInspectTargetIcon(selection, (iconState) => {
+      if (selection.part === "content") {
+        return {
+          contentOffsetX: clamp(iconState.contentOffsetX + deltaX, -PART_OFFSET_LIMIT, PART_OFFSET_LIMIT),
+          contentOffsetY: clamp(iconState.contentOffsetY + deltaY, -PART_OFFSET_LIMIT, PART_OFFSET_LIMIT),
+        };
+      }
+
+      return {
+        shapeOffsetX: clamp(iconState.shapeOffsetX + deltaX, -PART_OFFSET_LIMIT, PART_OFFSET_LIMIT),
+        shapeOffsetY: clamp(iconState.shapeOffsetY + deltaY, -PART_OFFSET_LIMIT, PART_OFFSET_LIMIT),
+      };
+    });
+  };
+
+  const handleResizeInspectPart = (
+    selection,
+    handle,
+    deltaX,
+    deltaY,
+    constrainProportions = false,
+  ) => {
+    if (!selection || (selection.part !== "content" && selection.part !== "base")) return;
+    const horizontalSign = handle.includes("e") ? 1 : -1;
+    const verticalSign = handle.includes("s") ? 1 : -1;
+    const signedDeltaX = deltaX * horizontalSign;
+    const signedDeltaY = deltaY * verticalSign;
+    setHighlightedInspectId(selection.id);
+
+    patchInspectTargetIcon(selection, (iconState) => {
+      const metrics = getIconMetrics(iconState);
+
+      if (selection.part === "content") {
+        const bounds = getInspectContentBounds(iconState, metrics);
+        const sizeReference = Math.max(1, (bounds.width + bounds.height) / 2);
+        const scaleInputDelta = constrainProportions
+          ? Math.abs(signedDeltaX) > Math.abs(signedDeltaY)
+            ? signedDeltaX
+            : signedDeltaY
+          : (signedDeltaX + signedDeltaY) / 2;
+        const scaleDelta = (scaleInputDelta / sizeReference) * 100;
+        return {
+          iconScale: resolveIconScaleForStateChange(
+            iconState,
+            iconState.iconScale + scaleDelta,
+          ),
+          contentOffsetX: clamp(
+            iconState.contentOffsetX + deltaX / 2,
+            -PART_OFFSET_LIMIT,
+            PART_OFFSET_LIMIT,
+          ),
+          contentOffsetY: clamp(
+            iconState.contentOffsetY + deltaY / 2,
+            -PART_OFFSET_LIMIT,
+            PART_OFFSET_LIMIT,
+          ),
+        };
+      }
+
+      const aspectRatio = metrics.dimensions.width / Math.max(1, metrics.dimensions.height);
+      let widthDelta = signedDeltaX;
+      let heightDelta = signedDeltaY;
+
+      if (constrainProportions) {
+        const widthDeltaFromY = signedDeltaY * aspectRatio;
+        widthDelta =
+          Math.abs(signedDeltaX) > Math.abs(widthDeltaFromY)
+            ? signedDeltaX
+            : widthDeltaFromY;
+        heightDelta = widthDelta / Math.max(0.001, aspectRatio);
+      }
+
+      const nextWidth = Math.max(ICON_BASE_SIZE_MIN, metrics.dimensions.width + widthDelta);
+      const nextHeight = Math.max(ICON_BASE_SIZE_MIN, metrics.dimensions.height + heightDelta);
+      const appliedDeltaX = constrainProportions ? widthDelta * horizontalSign : deltaX;
+      const appliedDeltaY = constrainProportions ? heightDelta * verticalSign : deltaY;
+      if (iconState.shape !== "shape" && iconState.shape !== "folder") {
+        return {
+          size: clamp((nextWidth + nextHeight) / 2, ICON_BASE_SIZE_MIN, ICON_BASE_SIZE_MAX),
+          shapeOffsetX: clamp(iconState.shapeOffsetX + appliedDeltaX / 2, -PART_OFFSET_LIMIT, PART_OFFSET_LIMIT),
+          shapeOffsetY: clamp(iconState.shapeOffsetY + appliedDeltaY / 2, -PART_OFFSET_LIMIT, PART_OFFSET_LIMIT),
+        };
+      }
+
+      return {
+        widthScale: clamp((nextWidth / Math.max(1, iconState.size)) * 100, ICON_SCALE_MIN, 260),
+        heightScale: clamp(
+          (nextHeight / Math.max(1, iconState.size)) * 100,
+          SHAPE_HEIGHT_SCALE_MIN,
+          SHAPE_HEIGHT_SCALE_MAX,
+        ),
+        shapeOffsetX: clamp(iconState.shapeOffsetX + appliedDeltaX / 2, -PART_OFFSET_LIMIT, PART_OFFSET_LIMIT),
+        shapeOffsetY: clamp(iconState.shapeOffsetY + appliedDeltaY / 2, -PART_OFFSET_LIMIT, PART_OFFSET_LIMIT),
+      };
+    });
+  };
+
+  const handleSelectInspectPart = (selection) => {
+    if (!selection) return;
+
+    if (selection.target.type === "particle") {
+      if (!particles[selection.target.corner]) return;
+      setEditorTarget({ type: "particle", corner: selection.target.corner });
+    } else {
+      setEditorTarget({ type: "base" });
+    }
+
+    if (selection.section === "content") {
+      setContentSectionOpen(true);
+    } else if (selection.section === "base") {
+      setShapeSectionOpen(true);
+    } else if (selection.section === "back") {
+      setBackLayerSectionOpen(true);
+    }
+
+    if (controlsRef.current) {
+      controlsRef.current.scrollTop = 0;
+      controlsRef.current.scrollLeft = 0;
+    }
+    setWorkspaceMode("editor");
+    setUiPhase("builder");
+    setSelectMenuOpen(false);
+    setHighlightedInspectId("");
+    setToast(`Editing ${selection.label}`);
   };
 
   const handleRemoveParticle = (cornerKey) => {
@@ -5903,6 +7689,738 @@ function App() {
     </div>
   );
 
+  const wizardPanel = (
+    <div className="wizard-panel">
+      <div className="wizard-sticky">
+        <div className="wizard-head">
+          <div>
+            <p className="wizard-kicker">
+              Step {wizardStepNumber} of {WIZARD_STEPS.length}
+            </p>
+            <h2>{wizardStep.title}</h2>
+          </div>
+        </div>
+
+        <div
+          className="wizard-step-tabs"
+          aria-label="Wizard steps"
+          data-walkthrough-target="wizard-steps"
+        >
+          <button
+            type="button"
+            className="wizard-step-arrow"
+            onClick={handleWizardBack}
+            disabled={!canGoBackInWizard}
+            aria-label="Go to previous step"
+          >
+            <ChevronLeft size={16} aria-hidden="true" />
+          </button>
+          {WIZARD_STEPS.map((step, index) => (
+            <button
+              type="button"
+              key={step.id}
+              className={index === wizardStepIndex ? "wizard-step-tab active" : "wizard-step-tab"}
+              onClick={() => setWizardStepIndex(index)}
+              aria-label={`Open ${step.title} step`}
+            >
+              <span>{index + 1}</span>
+            </button>
+          ))}
+          <button
+            type="button"
+            className="wizard-step-arrow"
+            onClick={handleWizardNext}
+            disabled={!canGoForwardInWizard}
+            aria-label="Go to next step"
+          >
+            <ChevronRight size={16} aria-hidden="true" />
+          </button>
+        </div>
+      </div>
+
+      {wizardStep.id === "content" ? (
+        <section className="wizard-card" data-walkthrough-target="wizard-content-card">
+          <div className="wizard-card-head">
+            <ContentSectionHeaderPreview state={baseState} />
+            <h3>Content</h3>
+            <label className="section-panel-switch wizard-inline-switch" title="Toggle content">
+              <input
+                type="checkbox"
+                checked={baseState.contentEnabled}
+                onChange={(event) => handleContentSectionEnabledChange(event.target.checked)}
+              />
+              <span className="section-panel-switch-track" aria-hidden="true">
+                <span className="section-panel-switch-thumb" />
+              </span>
+            </label>
+          </div>
+
+          <ToggleGroup
+            options={MODES}
+            value={baseState.mode}
+            onChange={(mode) => patchState({ mode })}
+            labels={MODE_TOGGLE_LABELS}
+          />
+
+          {baseState.mode === "text" ? (
+            <>
+              <label>
+                Text or emoji
+                <input
+                  type="text"
+                  value={baseState.content}
+                  maxLength={12}
+                  onChange={(event) => patchState({ content: event.target.value })}
+                  placeholder="A, OK, :)"
+                />
+              </label>
+              <label>
+                <span className="label-head">
+                  Font type
+                  <HelpHint text={ADVANCED_HELP.fontFamily} setTooltip={setCursorTooltip} />
+                </span>
+                <button
+                  type="button"
+                  className="btn-secondary font-picker-trigger"
+                  onClick={() => setFontPickerOpen(true)}
+                >
+                  <span className="font-picker-trigger-title">{selectedFontLabel}</span>
+                  <span className="font-picker-trigger-preview" style={{ fontFamily: baseState.fontFamily }}>
+                    Aa Bb 123
+                  </span>
+                </button>
+              </label>
+              <label>
+                <span className="label-head">
+                  Font weight
+                  <HelpHint text={ADVANCED_HELP.fontWeight} setTooltip={setCursorTooltip} />
+                </span>
+                <input
+                  type="range"
+                  min={FONT_WEIGHT_MIN}
+                  max={FONT_WEIGHT_MAX}
+                  step={100}
+                  list="wizard-font-weight-stops"
+                  value={Number.parseInt(baseState.fontWeight, 10)}
+                  onChange={(event) => patchState({ fontWeight: String(Number(event.target.value)) })}
+                />
+                <small>{baseState.fontWeight}</small>
+              </label>
+              <datalist id="wizard-font-weight-stops">
+                {FONT_WEIGHT_STOPS.map((weight) => (
+                  <option key={weight} value={weight} />
+                ))}
+              </datalist>
+            </>
+          ) : baseState.mode === "image" ? (
+            <ImageEditorControls
+              targetLabel="Content image"
+              inputRef={contentImageUploadInputRef}
+              imageState={getImageStateForTarget(baseState, "content")}
+              exportSizeLabel="Use content image size for export"
+              exportSizeSummary={
+                baseState.contentEnabled && baseState.mode === "image" && preferredImageExportDimensions
+                  ? exportSizeSummary
+                  : "Square canvas export"
+              }
+              isExportSizeEnabled={
+                baseState.contentEnabled && baseState.mode === "image" && Boolean(preferredImageExportDimensions)
+              }
+              isUsingExportImageSize={
+                baseState.contentEnabled && baseState.mode === "image" && shouldUseImportedImageExportSize
+              }
+              onExportSizeToggle={setUseImportedImageExportSize}
+              onFileChange={(event) => handleImageFileChange(event, "content")}
+              onUpload={() => handleUploadImageClick("content")}
+              onRecrop={() => handleRecropExistingImage("content")}
+              onRemove={() => handleRemoveImage("content")}
+              onPatch={(patch) => patchState(patch)}
+            />
+          ) : (
+            <>
+              <label>
+                Icon name
+                <input
+                  type="text"
+                  value={baseState.lucide}
+                  onChange={(event) => patchState({ lucide: event.target.value })}
+                  onBlur={(event) =>
+                    patchState({
+                      lucide: normalizeLucideName(event.target.value) || DEFAULT_STATE.lucide,
+                    })
+                  }
+                  placeholder="sparkles, bell-ring, chart-line"
+                />
+                <div className="field-actions">
+                  <button type="button" className="btn-ghost" onClick={() => setIconPickerOpen(true)}>
+                    Browse all icons
+                  </button>
+                </div>
+                <span className={baseMetrics.hasValidLucide ? "status ok" : "status warn"}>
+                  {baseMetrics.hasValidLucide
+                    ? `Loaded ${baseMetrics.iconName}`
+                    : "Name not found, using sparkles"}
+                </span>
+              </label>
+              <label>
+                <span className="label-head">
+                  Icon stroke weight
+                  <HelpHint text={ADVANCED_HELP.lucideWeight} setTooltip={setCursorTooltip} />
+                </span>
+                <input
+                  type="range"
+                  min={LUCIDE_WEIGHT_MIN}
+                  max={LUCIDE_WEIGHT_MAX}
+                  step={0.4}
+                  list="wizard-lucide-weight-stops"
+                  value={baseState.lucideWeight}
+                  onChange={(event) => patchState({ lucideWeight: Number.parseFloat(event.target.value) })}
+                />
+                <small>{baseState.lucideWeight.toFixed(1)}px</small>
+              </label>
+              <datalist id="wizard-lucide-weight-stops">
+                {LUCIDE_WEIGHT_STOPS.map((weight) => (
+                  <option key={weight} value={weight} />
+                ))}
+              </datalist>
+            </>
+          )}
+
+          <label>
+            <span className="label-head">
+              Content size in base
+              <HelpHint text={ADVANCED_HELP.iconScale} setTooltip={setCursorTooltip} />
+            </span>
+            <input
+              type="range"
+              min={ICON_SCALE_MIN}
+              max={baseContentScaleMax}
+              step={2}
+              value={baseState.iconScale}
+              onChange={(event) => handleIconScaleChange(Number(event.target.value))}
+            />
+            <div className="size-quick-row">
+              {[60, 80, 100].map((scale) => (
+                <button
+                  type="button"
+                  key={scale}
+                  className={baseState.iconScale === scale ? "size-chip active" : "size-chip"}
+                  onClick={() => handleIconScaleChange(scale)}
+                >
+                  {scale === 60 ? "S" : scale === 80 ? "M" : "L"}
+                </button>
+              ))}
+            </div>
+            <small>{baseState.iconScale}% of the base</small>
+            {isBaseTextScaleCappedByLink ? (
+              <small className="status warn">
+                Content size has reached the linked text-size limit for this base. Switch to
+                Editor, open Content &gt; Advanced, and turn off Link text size to base size to make
+                it larger.
+              </small>
+            ) : null}
+          </label>
+
+          <div className="color-controls-grid">
+            <label className="color-dot-control">
+              <span>Content</span>
+              <input
+                type="color"
+                value={baseState.textColor}
+                onChange={(event) => handleColorChange("textColor", event.target.value)}
+              />
+            </label>
+            <label>
+              Content transparency
+              <input
+                type="range"
+                min={0}
+                max={100}
+                step={1}
+                value={baseState.contentOpacity}
+                onChange={(event) => patchState({ contentOpacity: Number(event.target.value) })}
+              />
+              <small>{baseState.contentOpacity}%</small>
+            </label>
+          </div>
+
+          {baseState.mode !== "none" ? (
+            <div className="field-actions">
+              <button type="button" className="btn-ghost" onClick={handleCenterContentToBase}>
+                Center content to base
+              </button>
+            </div>
+          ) : null}
+
+          {baseState.mode !== "none" ? (
+            <div className="content-zone-control">
+              <span>Zone</span>
+              <ContentZoneControl
+                iconState={baseState}
+                metrics={baseMetrics}
+                onChange={handleContentZoneChange}
+                onReset={handleResetContentZone}
+              />
+            </div>
+          ) : null}
+
+          {baseState.mode === "text" || baseState.mode === "icon" ? (
+            <ContentRotationControl
+              value={baseState.contentRotation}
+              onChange={(contentRotation) => patchState({ contentRotation })}
+              onReset={() => patchState({ contentRotation: DEFAULT_STATE.contentRotation })}
+            />
+          ) : null}
+        </section>
+      ) : null}
+
+      {wizardStep.id === "base" ? (
+        <section className="wizard-card" data-walkthrough-target="wizard-base-card">
+          <div className="wizard-card-head">
+            <ShapeSectionHeaderPreview state={baseState} />
+            <h3>Base</h3>
+            <label className="section-panel-switch wizard-inline-switch" title="Toggle base">
+              <input
+                type="checkbox"
+                checked={baseState.shapeEnabled}
+                onChange={(event) => handleShapeSectionEnabledChange(event.target.checked)}
+              />
+              <span className="section-panel-switch-track" aria-hidden="true">
+                <span className="section-panel-switch-thumb" />
+              </span>
+            </label>
+          </div>
+
+          <label>
+            <span className="label-head">
+              Base size
+              <HelpHint text={ADVANCED_HELP.baseSize} setTooltip={setCursorTooltip} />
+            </span>
+            <input
+              type="range"
+              min={ICON_BASE_SIZE_MIN}
+              max={ICON_BASE_SIZE_MAX}
+              step={2}
+              value={baseState.size}
+              onChange={(event) => patchState({ size: Number(event.target.value) })}
+            />
+            <div className="size-quick-row">
+              {ICON_BASE_SIZE_PRESETS.map((presetSize) => (
+                <button
+                  type="button"
+                  key={presetSize}
+                  className={baseState.size === presetSize ? "size-chip active" : "size-chip"}
+                  onClick={() => patchState({ size: presetSize })}
+                >
+                  {presetSize}
+                </button>
+              ))}
+            </div>
+            <small>{baseState.size}px</small>
+          </label>
+
+          <div className="field-actions">
+            <button type="button" className="btn-ghost" onClick={handleCenterBaseToIcon}>
+              Center base to icon
+            </button>
+          </div>
+
+          <ToggleGroup
+            options={SHAPE_MODE_OPTIONS}
+            value={selectedShapeMode}
+            onChange={handleShapeModeChange}
+            labels={SHAPE_MODE_LABELS}
+          />
+
+          {selectedShapeMode === "shape" ? (
+            <>
+              <label>
+                <span>Preset</span>
+                <div className="size-quick-row shape-preset-row">
+                  {SHAPE_PRESET_OPTIONS.map((presetShape) => (
+                    <button
+                      type="button"
+                      key={presetShape}
+                      className={activeShapePreset === presetShape ? "size-chip active" : "size-chip"}
+                      onClick={() => applyShapePreset(presetShape)}
+                    >
+                      {SHAPE_TOGGLE_LABELS[presetShape]}
+                    </button>
+                  ))}
+                </div>
+              </label>
+              <div className="grid-two">
+                <label>
+                  Width scale
+                  <input
+                    type="range"
+                    min={ICON_SCALE_MIN}
+                    max={260}
+                    step={2}
+                    value={baseState.widthScale}
+                    onChange={(event) => patchState({ widthScale: Number(event.target.value) })}
+                  />
+                  <small>{(baseState.widthScale / 100).toFixed(2)}x</small>
+                </label>
+                <label>
+                  Height scale
+                  <input
+                    type="range"
+                    min={SHAPE_HEIGHT_SCALE_MIN}
+                    max={SHAPE_HEIGHT_SCALE_MAX}
+                    step={2}
+                    value={baseState.heightScale}
+                    onChange={(event) => patchState({ heightScale: Number(event.target.value) })}
+                  />
+                  <small>{(baseState.heightScale / 100).toFixed(2)}x</small>
+                </label>
+              </div>
+              <label>
+                Corner rounding
+                <input
+                  type="range"
+                  min={0}
+                  max={SHAPE_RADIUS_MAX}
+                  step={2}
+                  value={baseState.radius}
+                  onChange={(event) => patchState({ radius: Number(event.target.value) })}
+                />
+                <small>{baseState.radius}px</small>
+              </label>
+            </>
+          ) : selectedShapeMode === "folder" ? (
+            <FolderControls state={baseState} patchState={patchState} />
+          ) : (
+            <ImageEditorControls
+              targetLabel="Shape image"
+              inputRef={shapeImageUploadInputRef}
+              imageState={getImageStateForTarget(baseState, "shape")}
+              exportSizeLabel="Use shape image size for export"
+              exportSizeSummary={
+                baseState.shapeEnabled && baseState.shape === "image" && preferredImageExportDimensions
+                  ? exportSizeSummary
+                  : "Square canvas export"
+              }
+              isExportSizeEnabled={
+                baseState.shapeEnabled && baseState.shape === "image" && Boolean(preferredImageExportDimensions)
+              }
+              isUsingExportImageSize={
+                baseState.shapeEnabled && baseState.shape === "image" && shouldUseImportedImageExportSize
+              }
+              onExportSizeToggle={setUseImportedImageExportSize}
+              onFileChange={(event) => handleImageFileChange(event, "shape")}
+              onUpload={() => handleUploadImageClick("shape")}
+              onRecrop={() => handleRecropExistingImage("shape")}
+              onRemove={() => handleRemoveImage("shape")}
+              onPatch={(patch) =>
+                patchState(getImagePatchForTarget("shape", { ...getImageStateForTarget(baseState, "shape"), ...patch }))
+              }
+            />
+          )}
+
+          <div className="gradient-control-pair">
+            <GradientColorControl
+              label="Fill"
+              stops={baseState.fillStops}
+              gradientType={baseState.fillGradientType}
+              angle={baseState.fillGradientAngle}
+              centerX={baseState.fillGradientCenterX}
+              centerY={baseState.fillGradientCenterY}
+              onStopChange={(index, value) => handleGradientStopChange("fillStops", index, value)}
+              onAddStop={() => handleGradientStopAdd("fillStops")}
+              onRemoveStop={(index) => handleGradientStopRemove("fillStops", index)}
+              onGradientTypeChange={(type) => patchState({ fillGradientType: type })}
+              onAngleChange={(nextAngle) => patchState({ fillGradientAngle: nextAngle })}
+              onCenterChange={(x, y) => patchState({ fillGradientCenterX: x, fillGradientCenterY: y })}
+            />
+            <GradientColorControl
+              label="Stroke"
+              stops={baseState.strokeStops}
+              gradientType={baseState.strokeGradientType}
+              angle={baseState.strokeGradientAngle}
+              centerX={baseState.strokeGradientCenterX}
+              centerY={baseState.strokeGradientCenterY}
+              onStopChange={(index, value) => handleGradientStopChange("strokeStops", index, value)}
+              onAddStop={() => handleGradientStopAdd("strokeStops")}
+              onRemoveStop={(index) => handleGradientStopRemove("strokeStops", index)}
+              onGradientTypeChange={(type) => patchState({ strokeGradientType: type })}
+              onAngleChange={(nextAngle) => patchState({ strokeGradientAngle: nextAngle })}
+              onCenterChange={(x, y) => patchState({ strokeGradientCenterX: x, strokeGradientCenterY: y })}
+            />
+          </div>
+
+          <div className="grid-two">
+            <label>
+              Stroke width
+              <input
+                type="range"
+                min={0}
+                max={24}
+                step={1}
+                value={baseState.outline}
+                onChange={(event) => patchState({ outline: Number(event.target.value) })}
+              />
+              <small>{baseState.outline}px</small>
+            </label>
+            <label>
+              Base transparency
+              <input
+                type="range"
+                min={0}
+                max={100}
+                step={1}
+                value={baseState.baseOpacity}
+                onChange={(event) => patchState({ baseOpacity: Number(event.target.value) })}
+              />
+              <small>{baseState.baseOpacity}%</small>
+            </label>
+          </div>
+        </section>
+      ) : null}
+
+      {wizardStep.id === "back" ? (
+        <section className="wizard-card" data-walkthrough-target="wizard-back-card">
+          <div className="wizard-card-head">
+            <BackLayerSectionHeaderPreview state={baseState} />
+            <h3>Back</h3>
+            <label className="section-panel-switch wizard-inline-switch" title="Toggle back">
+              <input
+                type="checkbox"
+                checked={baseState.backLayerEnabled}
+                onChange={(event) => handleBackLayerSectionEnabledChange(event.target.checked)}
+              />
+              <span className="section-panel-switch-track" aria-hidden="true">
+                <span className="section-panel-switch-thumb" />
+              </span>
+            </label>
+          </div>
+
+          <BackLayerWheel
+            angle={baseState.backAngle}
+            distance={baseState.backDistance}
+            onChange={handleBackLayerChange}
+            lockDistance={isBackDistanceLocked}
+            lockAngle={isBackAngleLocked}
+            onLockDistanceChange={setBackDistanceLocked}
+            onLockAngleChange={setBackAngleLocked}
+          />
+          <div className="color-controls-grid">
+            <label className="color-dot-control">
+              <span>Back</span>
+              <input
+                type="color"
+                value={baseState.backColor}
+                onChange={(event) => handleColorChange("backColor", event.target.value)}
+              />
+            </label>
+            <button
+              type="button"
+              className="btn-ghost wizard-reset-back"
+              disabled={isBackDistanceLocked}
+              onClick={() => patchState({ backDistance: 0 })}
+            >
+              Reset back layer
+            </button>
+          </div>
+        </section>
+      ) : null}
+
+      {wizardStep.id === "particles" ? (
+        <section
+          className="wizard-card wizard-particles-card"
+          data-walkthrough-target="wizard-particles-card"
+        >
+          <div className="wizard-card-head">
+            <StaticCompositionPreview
+              baseState={baseState}
+              particles={particles}
+              targetSize={52}
+              padding={6}
+              className="wizard-finish-icon"
+            />
+            <h3>Particles</h3>
+          </div>
+
+          <div>
+            <p className="wizard-particle-label">Particles</p>
+            <div className="wizard-particle-grid">
+              {PARTICLE_CORNERS.map((corner) => (
+                <button
+                  type="button"
+                  key={corner.key}
+                  className={particles[corner.key] ? "wizard-particle-button active" : "wizard-particle-button"}
+                  onClick={() => handleWizardParticleAdd(corner.key)}
+                >
+                  <Plus size={14} aria-hidden="true" />
+                  {corner.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      {wizardStep.id === "share" ? (
+        <section
+          className="wizard-card wizard-share-card"
+          data-walkthrough-target="wizard-share-card"
+        >
+          <div className="wizard-card-head wizard-share-head">
+            <StaticCompositionPreview
+              baseState={baseState}
+              particles={particles}
+              targetSize={64}
+              padding={8}
+              className="wizard-finish-icon"
+            />
+            <div>
+              <h3>Share + Export</h3>
+              <p className="wizard-share-subtitle">
+                Export your PNG, copy a link, or keep refining in the full editor.
+              </p>
+              <p className="wizard-share-subtitle">
+                Project files preserve uploaded images and are best for work you want to revisit.
+              </p>
+            </div>
+          </div>
+
+          <div className="wizard-summary-grid">
+            <label className="export-share-pane-label wizard-share-setting">
+              <span>Workspace canvas</span>
+              <div className="size-quick-row">
+                {CANVAS_SIZE_PRESETS.map((size) => (
+                  <button
+                    type="button"
+                    key={size}
+                    className={canvasSize === size ? "size-chip active" : "size-chip"}
+                    onClick={() => handleCanvasSizeChange(size)}
+                  >
+                    {size}
+                  </button>
+                ))}
+              </div>
+              <small>{canvasSize} x {canvasSize}</small>
+            </label>
+            <label className="export-share-pane-label wizard-share-setting">
+              <span>PNG scale</span>
+              <div className="size-quick-row">
+                {EXPORT_SCALE_OPTIONS.map((scale) => (
+                  <button
+                    type="button"
+                    key={scale}
+                    className={exportScale === scale ? "size-chip active" : "size-chip"}
+                    onClick={() => setExportScale(scale)}
+                  >
+                    {scale}x
+                  </button>
+                ))}
+              </div>
+              <small>{exportSizeSummary}</small>
+            </label>
+          </div>
+
+          <div className="wizard-share-actions">
+            <button type="button" className="btn-primary wizard-share-primary" onClick={handleExport}>
+              <Download size={16} aria-hidden="true" />
+              Export PNG
+            </button>
+            <button type="button" className="btn-secondary" onClick={handleCopyShareLink}>
+              <Clipboard size={16} aria-hidden="true" />
+              Copy link
+            </button>
+            <button type="button" className="btn-secondary" onClick={handleOpenEditor}>
+              <PenLine size={16} aria-hidden="true" />
+              Open editor
+            </button>
+          </div>
+
+          <div className="wizard-share-secondary">
+            <button
+              type="button"
+              className="btn-ghost"
+              onClick={() => {
+                setLoadCode(fullShareCode);
+                setShareOpen(true);
+              }}
+            >
+              Import / export code
+            </button>
+            <button
+              type="button"
+              className="btn-ghost"
+              onClick={() => copyToClipboard(fullShareCode, "Share code copied (full fidelity)")}
+            >
+              Copy code
+            </button>
+            <button type="button" className="btn-ghost" onClick={handleExportProject}>
+              Export project
+            </button>
+          </div>
+
+          <div className="wizard-integration-callout">
+            <div>
+              <h4>Add iquan support to your app</h4>
+              <p>
+                Use the implementation spec to teach another app how to decode, render,
+                and display iquans inline.
+              </p>
+            </div>
+            <button type="button" className="btn-secondary" onClick={handleOpenSpecModal}>
+              Open spec
+            </button>
+          </div>
+        </section>
+      ) : null}
+
+      <div className="wizard-nav">
+        <button
+          type="button"
+          className="btn-ghost wizard-nav-button"
+          onClick={handleWizardBack}
+          disabled={!canGoBackInWizard}
+        >
+          <ChevronLeft size={16} aria-hidden="true" />
+          Back
+        </button>
+        {canGoForwardInWizard ? (
+          <button type="button" className="btn-primary wizard-nav-button" onClick={handleWizardNext}>
+            Next
+            <ChevronRight size={16} aria-hidden="true" />
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+
+  const walkthroughOverlay =
+    isWalkthroughActive && walkthroughStep ? (
+      <div className="walkthrough-layer" aria-live="polite">
+        <aside
+          className="walkthrough-card"
+          style={{
+            top: `${walkthroughCardPosition.top}px`,
+            left: `${walkthroughCardPosition.left}px`,
+          }}
+          role="dialog"
+          aria-label="Wizard walkthrough"
+        >
+          <p className="walkthrough-kicker">
+            {walkthroughStepNumber} of {WIZARD_WALKTHROUGH_STEPS.length}
+          </p>
+          <h3>{walkthroughStep.title}</h3>
+          <p>{walkthroughStep.body}</p>
+          <div className="walkthrough-actions">
+            <button type="button" className="btn-ghost" onClick={handleWalkthroughSkip}>
+              Skip
+            </button>
+            <button type="button" className="btn-primary" onClick={handleWalkthroughNext}>
+              {canGoForwardInWalkthrough ? "Next" : "Finish"}
+            </button>
+          </div>
+        </aside>
+      </div>
+    ) : null;
+
   const aboutModal = (
     <Modal
       open={isInfoOpen}
@@ -5943,6 +8461,47 @@ function App() {
     </Modal>
   );
 
+  const specModal = (
+    <Modal
+      open={isSpecOpen}
+      title="Add Iquans to Your App"
+      onClose={() => setSpecOpen(false)}
+      actions={
+        <>
+          <a
+            className="about-modal-link about-modal-link-secondary iquan-spec-action-link iquan-spec-repo-action"
+            href="https://github.com/RockhopperHD/iquan"
+            target="_blank"
+            rel="noreferrer"
+          >
+            View GitHub repo
+          </a>
+          <button type="button" className="btn-secondary" onClick={handleCopyIquanSpec}>
+            <Clipboard size={16} aria-hidden="true" />
+            Copy spec
+          </button>
+          <button type="button" className="btn-primary" onClick={handleDownloadIquanSpec}>
+            <Download size={16} aria-hidden="true" />
+            Download spec
+          </button>
+        </>
+      }
+    >
+      <div className="about-modal-content iquan-spec-modal-content">
+        <p className="about-modal-copy">
+          Give this Markdown spec to your LLM coder so it can add iquan decoding,
+          rendering, and inline display support to another app. You can do this with Codex:
+          copy or download the spec, open your app in Codex, and ask it to add iquan support
+          using <code>IQUAN_SPEC.md</code>.
+        </p>
+        <label className="iquan-spec-code-field">
+          <span>IQUAN_SPEC.md</span>
+          <textarea value={iquanSpecMarkdown} readOnly spellCheck="false" />
+        </label>
+      </div>
+    </Modal>
+  );
+
   if (pageMode === "copiedLink") {
     const isValidSharedPage = sharePageStatus === "valid";
     const isUnsupportedSharedPage = sharePageStatus === "unsupported-images";
@@ -5954,13 +8513,25 @@ function App() {
         <header className="app-header shared-page-header" aria-live="polite">
           <div className="app-header-side" />
           <a className="app-header-title app-header-title-link" href={builderHomeUrl}>
-            Iquan Icon Builder
+            {appHeaderTitleContent}
           </a>
           <div className="app-header-side app-header-side-end">
             <button
               type="button"
+              className={specButtonClass}
+              onClick={handleOpenSpecModal}
+              aria-label="Add Iquans to your app"
+              title="Add Iquans to your app"
+            >
+              Add Iquans to your app
+            </button>
+            <button
+              type="button"
               className="app-header-info"
-              onClick={() => setInfoOpen(true)}
+              onClick={() => {
+                setSpecOpen(false);
+                setInfoOpen(true);
+              }}
               aria-label="Open app information"
               title="App information"
             >
@@ -6076,6 +8647,7 @@ function App() {
 
           {exportCaptureBuffer}
           {aboutModal}
+          {specModal}
           {toast ? <div className="toast">{toast}</div> : null}
         </main>
       </div>
@@ -6123,13 +8695,25 @@ function App() {
           aria-label="Return to Iquan home screen"
           title="Return to Iquan home screen"
         >
-          Iquan Icon Builder
+          {appHeaderTitleContent}
         </button>
         <div className="app-header-side app-header-side-end">
           <button
             type="button"
+            className={specButtonClass}
+            onClick={handleOpenSpecModal}
+            aria-label="Add Iquans to your app"
+            title="Add Iquans to your app"
+          >
+            Add Iquans to your app
+          </button>
+          <button
+            type="button"
             className="app-header-info"
-            onClick={() => setInfoOpen(true)}
+            onClick={() => {
+              setSpecOpen(false);
+              setInfoOpen(true);
+            }}
             aria-label="Open app information"
             title="App information"
           >
@@ -6140,11 +8724,35 @@ function App() {
 
       <div className="pane-column">
         <div className="pane-display-head">
-          <h2 className="pane-display-title">Editor</h2>
+          <h2
+            className="pane-mode-title-switch"
+            data-active-mode={workspaceMode}
+          >
+            <button
+              type="button"
+              className="pane-mode-title pane-mode-title-wizard"
+              onClick={handleOpenWizard}
+              aria-pressed={isWizardWorkspaceMode}
+            >
+              Wizard
+            </button>
+            <button
+              type="button"
+              className="pane-mode-title pane-mode-title-editor"
+              onClick={handleOpenEditor}
+              aria-pressed={!isWizardWorkspaceMode}
+            >
+              Editor
+            </button>
+          </h2>
         </div>
 
         <aside ref={controlsRef} className="controls">
           <div className="controls-content" aria-hidden={isHeroVisible}>
+        {workspaceMode === "wizard" ? (
+          wizardPanel
+        ) : (
+          <>
         <div className="editor-target-banner">
           <div className="editor-target-head">
             <h2 className="editor-target-title">
@@ -6400,6 +9008,26 @@ function App() {
                 </>
               )}
 
+              {state.mode !== "none" ? (
+                <div className="field-actions">
+                  <button type="button" className="btn-ghost" onClick={handleCenterContentToBase}>
+                    Center content to base
+                  </button>
+                </div>
+              ) : null}
+
+              {state.mode !== "none" ? (
+                <div className="content-zone-control">
+                  <span>Zone</span>
+                  <ContentZoneControl
+                    iconState={state}
+                    metrics={activeMetrics}
+                    onChange={handleContentZoneChange}
+                    onReset={handleResetContentZone}
+                  />
+                </div>
+              ) : null}
+
               <label>
                 Content transparency
                 <input
@@ -6414,6 +9042,14 @@ function App() {
                 />
                 <small>{state.contentOpacity}%</small>
               </label>
+
+              {state.mode === "text" || state.mode === "icon" ? (
+                <ContentRotationControl
+                  value={state.contentRotation}
+                  onChange={(contentRotation) => patchState({ contentRotation })}
+                  onReset={() => patchState({ contentRotation: DEFAULT_STATE.contentRotation })}
+                />
+              ) : null}
 
               <label className="color-dot-control">
                 <span>Content</span>
@@ -6433,7 +9069,7 @@ function App() {
                   <input
                     type="range"
                     min={ICON_SCALE_MIN}
-                    max={ICON_SCALE_MAX}
+                    max={contentScaleMax}
                     step={2}
                     value={state.iconScale}
                     onChange={(event) => handleIconScaleChange(Number(event.target.value))}
@@ -6466,8 +9102,9 @@ function App() {
                   </small>
                   {isTextScaleCappedByLink ? (
                     <small className="status warn">
-                      Text size is capped by linked {currentBaseLabel} sizing. Open Advanced and
-                      turn off Link text size to base size.
+                      Content size has reached the linked text-size limit for this{" "}
+                      {currentBaseLabel}. To make the text larger, turn off Link text size to base
+                      size in Advanced.
                     </small>
                   ) : null}
                 </label>
@@ -6575,12 +9212,16 @@ function App() {
                 <small>{state.size}px</small>
               </label>
 
+              <div className="field-actions">
+                <button type="button" className="btn-ghost" onClick={handleCenterBaseToIcon}>
+                  Center base to icon
+                </button>
+              </div>
+
               <ToggleGroup
                 options={SHAPE_MODE_OPTIONS}
                 value={selectedShapeMode}
-                onChange={(shapeMode) =>
-                  patchState({ shape: shapeMode === "shape" ? "shape" : shapeMode })
-                }
+                onChange={handleShapeModeChange}
                 labels={SHAPE_MODE_LABELS}
               />
 
@@ -6705,6 +9346,72 @@ function App() {
                       onChange={(event) => patchState({ radius: Number(event.target.value) })}
                     />
                     <small>{state.radius}px</small>
+                  </label>
+                </>
+              ) : state.shape === "folder" ? (
+                <>
+                  <FolderControls state={state} patchState={patchState} />
+
+                  <label>
+                    Base transparency
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      step={1}
+                      value={state.baseOpacity}
+                      onChange={(event) => patchState({ baseOpacity: Number(event.target.value) })}
+                    />
+                    <small>{state.baseOpacity}%</small>
+                  </label>
+
+                  <div className="gradient-control-pair">
+                    <GradientColorControl
+                      label="Fill"
+                      stops={state.fillStops}
+                      gradientType={state.fillGradientType}
+                      angle={state.fillGradientAngle}
+                      centerX={state.fillGradientCenterX}
+                      centerY={state.fillGradientCenterY}
+                      onStopChange={(index, value) => handleGradientStopChange("fillStops", index, value)}
+                      onAddStop={() => handleGradientStopAdd("fillStops")}
+                      onRemoveStop={(index) => handleGradientStopRemove("fillStops", index)}
+                      onGradientTypeChange={(type) => patchState({ fillGradientType: type })}
+                      onAngleChange={(nextAngle) => patchState({ fillGradientAngle: nextAngle })}
+                      onCenterChange={(x, y) =>
+                        patchState({ fillGradientCenterX: x, fillGradientCenterY: y })
+                      }
+                    />
+
+                    <GradientColorControl
+                      label="Stroke"
+                      stops={state.strokeStops}
+                      gradientType={state.strokeGradientType}
+                      angle={state.strokeGradientAngle}
+                      centerX={state.strokeGradientCenterX}
+                      centerY={state.strokeGradientCenterY}
+                      onStopChange={(index, value) => handleGradientStopChange("strokeStops", index, value)}
+                      onAddStop={() => handleGradientStopAdd("strokeStops")}
+                      onRemoveStop={(index) => handleGradientStopRemove("strokeStops")}
+                      onGradientTypeChange={(type) => patchState({ strokeGradientType: type })}
+                      onAngleChange={(nextAngle) => patchState({ strokeGradientAngle: nextAngle })}
+                      onCenterChange={(x, y) =>
+                        patchState({ strokeGradientCenterX: x, strokeGradientCenterY: y })
+                      }
+                    />
+                  </div>
+
+                  <label>
+                    Stroke width
+                    <input
+                      type="range"
+                      min={0}
+                      max={24}
+                      step={1}
+                      value={state.outline}
+                      onChange={(event) => patchState({ outline: Number(event.target.value) })}
+                    />
+                    <small>{state.outline}px</small>
                   </label>
                 </>
               ) : state.shape === "image" ? (
@@ -6895,23 +9602,51 @@ function App() {
           </>
         </SectionPanel>
 
+          </>
+        )}
           </div>
           <div className="controls-hero" aria-hidden={!isHeroVisible}>
             <div className="controls-hero-content">
               <p className="controls-hero-eyebrow">Iquan</p>
-              <h1>Tiny icons, ready for real places</h1>
+              <h1>Tiny icons for real places</h1>
               <p className="controls-hero-copy">{HERO_DESCRIPTION}</p>
-              <ul className="controls-hero-points">
-                {HERO_PROOF_POINTS.map((point) => (
-                  <li key={point}>{point}</li>
-                ))}
-              </ul>
+              <p className="controls-hero-story">
+                Shape <strong>text</strong>, <strong>Lucide symbols</strong>, and{" "}
+                <strong>uploaded images</strong> into crisp little assets; tune the base,
+                outlines, particles, and colors, then preview them where they actually live
+                before exporting a PNG or saving the whole project.
+              </p>
+              <label className="controls-hero-walkthrough">
+                <input
+                  type="checkbox"
+                  checked={walkthroughRequested}
+                  onChange={handleWalkthroughToggle}
+                />
+                <span className="controls-hero-walkthrough-box" aria-hidden="true" />
+                <span>Walk me through it</span>
+              </label>
               <div className="controls-hero-actions">
                 <button type="button" className="btn-primary controls-hero-cta" onClick={handleStartBuilder}>
-                  {isDefaultComposition ? "Start from scratch" : "Continue From Here"}
+                  {isDefaultComposition ? "Start the Wizard" : "Continue in the Wizard"}
                 </button>
+                <div className="controls-hero-alternates" aria-label="Other ways to start">
+                  <button
+                    type="button"
+                    className="btn-secondary controls-hero-alt-button"
+                    onClick={handleOpenEditor}
+                  >
+                    Open Editor
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-secondary controls-hero-alt-button"
+                    onClick={handleOpenLandingImport}
+                  >
+                    Import Project
+                  </button>
+                </div>
               </div>
-              <p className="starter-template-label">...or use a preset:</p>
+              <p className="starter-template-label">Start from a preset</p>
               <div className="starter-template-grid" aria-label="Starter templates">
                 {STARTER_TEMPLATES.map((template) => (
                   <StarterTemplateButton
@@ -6943,7 +9678,58 @@ function App() {
               </span>
             </div>
 
-            <div className="preview-stage">
+            <div className="preview-stage" data-walkthrough-target="preview-stage">
+              <div className="inspect-selector">
+                <div className="inspect-selector-row">
+                  <button
+                    type="button"
+                    className={
+                      isSelectMenuOpen
+                        ? "inspect-selector-button active"
+                        : "inspect-selector-button"
+                    }
+                    onClick={() => {
+                      setSelectMenuOpen((open) => !open);
+                      setHighlightedInspectId("");
+                    }}
+                    aria-expanded={isSelectMenuOpen}
+                    aria-haspopup="menu"
+                  >
+                    Select Something
+                  </button>
+                  <span className="inspect-selector-hint">
+                    ...or use the mouse in the preview space to move and resize elements.
+                    Hold Shift to keep proportions.
+                  </span>
+                </div>
+                {isSelectMenuOpen ? (
+                  <div className="inspect-selector-menu" role="menu">
+                    {inspectTargets.length > 0 ? (
+                      inspectTargets.map((target) => (
+                        <button
+                          type="button"
+                          key={target.id}
+                          className={
+                            highlightedInspectId === target.id
+                              ? "inspect-selector-item highlighted"
+                              : "inspect-selector-item"
+                          }
+                          role="menuitem"
+                          onMouseEnter={() => setHighlightedInspectId(target.id)}
+                          onMouseLeave={() => setHighlightedInspectId("")}
+                          onFocus={() => setHighlightedInspectId(target.id)}
+                          onBlur={() => setHighlightedInspectId("")}
+                          onClick={() => handleSelectInspectPart(target)}
+                        >
+                          <span>{target.label}</span>
+                        </button>
+                      ))
+                    ) : (
+                      <span className="inspect-selector-empty">No visible pieces</span>
+                    )}
+                  </div>
+                ) : null}
+              </div>
               <div className="preview-main-shell">
                 <div
                   className="preview-canvas"
@@ -6961,10 +9747,17 @@ function App() {
                       editorTarget={editorTarget}
                       className="preview-main-stack"
                       interactive={true}
+                      inspectMode={true}
+                      highlightedInspectId={highlightedInspectId}
+                      inspectDragScale={previewLayout.scale * previewZoomScale}
                       showCornerHotspots={true}
                       onSelectBase={handleSelectBase}
                       onSelectParticle={handleSelectParticle}
                       onCornerAdd={handleCornerAddOrSelect}
+                      onHighlightInspectPart={setHighlightedInspectId}
+                      onSelectInspectPart={handleSelectInspectPart}
+                      onDragInspectPart={handleDragInspectPart}
+                      onResizeInspectPart={handleResizeInspectPart}
                     />
                   </div>
                 </div>
@@ -7209,6 +10002,8 @@ function App() {
         </button>
       </section>
 
+      {walkthroughOverlay}
+
       {exportCaptureBuffer}
 
       <input
@@ -7220,6 +10015,7 @@ function App() {
       />
 
       {aboutModal}
+      {specModal}
 
       <Modal
         open={isShareOpen}
