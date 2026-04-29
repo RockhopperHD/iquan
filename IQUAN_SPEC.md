@@ -10,9 +10,9 @@ An iquan is a compact, renderable icon composition. It is not a single Unicode c
 
 An iquan composition contains:
 
-- A required base icon state.
-- Zero or more particle icon states anchored to points around the base.
-- A canvas size used for editor/export framing, defaulting to `500`.
+- A required primary part icon state. In the encoded formats, this is still stored under the legacy `base`/`b` fields for compatibility.
+- Zero or more particle icon states anchored to points around the primary part.
+- A canvas size used for editor/export framing, defaulting to `640`.
 
 Every icon state contains:
 
@@ -22,7 +22,7 @@ Every icon state contains:
 - Optional content and base offsets for moving the content face or base surface away from the icon state's origin.
 - Paint, stroke, opacity, typography, image-processing, sizing, and rounding fields.
 
-Particles are independent icon states. They use the same rendering rules as the base, but are positioned relative to a named anchor point on the base.
+Particles are independent icon states. They use the same rendering rules as the primary part, but are positioned relative to a named anchor point on the primary part.
 
 ## Code Families
 
@@ -68,7 +68,7 @@ The decoded payload has this shape:
     "f": ["#ecfeff", "#a5f3fc"],
     "o": ["#0891b2"]
   },
-  "c": 500,
+  "c": 640,
   "p": [
     [2, 8, -8, { "m": "icon", "l": "sparkles", "s": 70 }]
   ]
@@ -80,8 +80,8 @@ Payload fields:
 | Field | Required | Meaning |
 | --- | --- | --- |
 | `version` | Yes | Must be `IC11` for current output. `IC9` and `IC10` use the same decoded shape in the reference app. |
-| `b` | Yes | Compact base icon state. Missing fields are filled from defaults. |
-| `c` | No | Canvas size in px. Defaults to `500`. Sanitized to `320..960`. |
+| `b` | Yes | Compact primary part icon state. Missing fields are filled from defaults. |
+| `c` | No | Canvas size in px. Defaults to `640`. Sanitized to `320..960`. |
 | `p` | No | Particle list. Each item is `[cornerIndex, offsetX, offsetY, compactIconState?]`. |
 
 The share-code encoder omits fields whose values match defaults. A decoder must expand the compact object, apply defaults, then sanitize.
@@ -90,14 +90,14 @@ Important: URL-safe share codes intentionally strip uploaded image payloads. If 
 
 To encode a new `IC11` code from a state:
 
-1. Sanitize the base icon state.
-2. If producing a URL-safe share code, clear all content-image and shape-image payload fields on the base and every particle.
+1. Sanitize the primary part icon state.
+2. If producing a URL-safe share code, clear all content-image and shape-image payload fields on the primary part and every particle.
 3. Sanitize the canvas size to `320..960`.
 4. Build `b` by comparing each full icon-state field to the default state and writing only fields whose values differ, using the compact-token map below.
 5. Iterate particle corners in the fixed order `topLeft`, `topMiddle`, `topRight`, `left`, `right`, `bottomLeft`, `bottomMiddle`, `bottomRight`.
 6. For each existing particle, sanitize it and write `[cornerIndex, offsetX, offsetY]`.
 7. Compact the particle's icon state. If any fields differ from defaults, append that compact object as the fourth array item.
-8. Build `{ "version": "IC11", "b": compactBase }`, adding `c` only if the canvas is not `500`, and adding `p` only if at least one particle exists.
+8. Build `{ "version": "IC11", "b": compactBase }`, adding `c` only if the canvas is not `640`, and adding `p` only if at least one particle exists.
 9. JSON-stringify the payload without requiring indentation.
 10. Base64url-encode the JSON and prepend `IC11|`.
 
@@ -113,7 +113,7 @@ Project files are JSON, not base64-wrapped:
     "title": "Untitled Iquan icon",
     "createdAt": "2026-04-27T00:00:00.000Z"
   },
-  "canvasSize": 500,
+  "canvasSize": 640,
   "base": {
     "mode": "text",
     "content": "A"
@@ -139,7 +139,7 @@ Project fields:
 | `app` | Yes | Must be `iquan`. |
 | `metadata` | No | Free metadata. The app writes a title and may write `createdAt`. |
 | `canvasSize` | No | Export/editor canvas size, sanitized to `320..960`. |
-| `base` | Yes | Full, uncompacted icon state. |
+| `base` | Yes | Full, uncompacted primary part icon state. The field name is retained for compatibility. |
 | `particles` | No | Object keyed by particle corner names. |
 
 Project files may include `data:image/...` payloads and are the preferred interchange format when uploaded images matter.
@@ -184,6 +184,7 @@ An `IC11` compact icon state maps short tokens to full icon-state fields. When d
 | `cox` | `contentOffsetX` |
 | `coy` | `contentOffsetY` |
 | `cr` | `contentRotation` |
+| `ctb` | `clipContentToBase` |
 | `sox` | `shapeOffsetX` |
 | `soy` | `shapeOffsetY` |
 | `o` | `strokeStops` |
@@ -253,7 +254,7 @@ Use this state before applying compact or project fields:
   "folderTabWidth": 34,
   "folderTabHeight": 20,
   "fontSize": 78,
-  "linkTextToSize": true,
+  "linkTextToSize": false,
   "spacing": 0,
   "fontFamily": "Inter, system-ui, sans-serif",
   "fontWeight": "700",
@@ -271,6 +272,7 @@ Use this state before applying compact or project fields:
   "contentOffsetX": 0,
   "contentOffsetY": 0,
   "contentRotation": 0,
+  "clipContentToBase": false,
   "shapeOffsetX": 0,
   "shapeOffsetY": 0,
   "outlineColor": "#d6deed",
@@ -358,7 +360,7 @@ Field bounds and enums:
 | `folderTabWidth` | Integer, `18..82`, tab width as a percentage of folder width. |
 | `folderTabHeight` | Integer, `10..42`, tab height as a percentage of folder height. |
 | `fontSize` | Integer, `16..180`. |
-| `linkTextToSize` | `false` only if explicitly false; otherwise true. |
+| `linkTextToSize` | Boolean. Defaults to `false`; true only if explicitly enabled. |
 | `spacing` | Integer, `0..20`. |
 | `fontFamily` | String, no validation beyond conversion. |
 | `fontWeight` | Integer parsed from input, clamped to `100..1000`, stored as a string. |
@@ -374,6 +376,7 @@ Field bounds and enums:
 | `contentOpacity` | Integer, `0..100`. |
 | `contentOffsetX`, `contentOffsetY` | Floats, `-180..180` px. Moves text, Lucide icon, or content image relative to the icon state's content origin. |
 | `contentRotation` | Float, `-180..180` degrees. Applies to text and Lucide icon content. Uploaded image rotation uses image-specific rotation fields. |
+| `clipContentToBase` | Boolean. If true and a base is enabled, content is clipped to the active base bounds so overflowing content is hidden. |
 | `shapeOffsetX`, `shapeOffsetY` | Floats, `-180..180` px. Moves the base surface and its back layer relative to the icon state's origin. Content remains independently positioned by content offsets. |
 | `strokeStops` | Same as `fillStops`. |
 | `strokeColor`, `outlineColor` | Legacy aliases. If `strokeStops` is not an array, use `strokeColor` or `outlineColor` as first stop. |
@@ -419,9 +422,9 @@ Content options:
 
 - Enable/disable content with `contentEnabled`; disabled content renders nothing and normalizes `mode` back to the default for storage.
 - Choose content mode: `text`, `icon`, `image`, or legacy/imported `none`.
-- Text mode: edit `content`, `fontFamily`, `fontWeight`, `fontSize`, `linkTextToSize`, `spacing`, `textColor`, `contentOpacity`, `contentOffsetX`, `contentOffsetY`, `contentRotation`, `iconScale`, and `inset`.
-- Icon mode: edit `lucide`, `lucideWeight`, `textColor`, `contentOpacity`, `contentOffsetX`, `contentOffsetY`, `contentRotation`, `iconScale`, and `inset`.
-- Image mode: edit/upload/remove `imageData`, `imageName`, `imageWidth`, `imageHeight`, crop fields, `imageRotation`, `imageHue`, `imageContrast`, `imageBrightness`, `imageSilhouette`, `imageSilhouetteColor`, `imageEdgeStroke`, `imageEdgeStrokeColor`, `contentOpacity`, `contentOffsetX`, `contentOffsetY`, `iconScale`, and `inset`.
+- Text mode: edit `content`, `fontFamily`, `fontWeight`, `fontSize`, `linkTextToSize`, `spacing`, `textColor`, `contentOpacity`, `contentOffsetX`, `contentOffsetY`, `contentRotation`, `clipContentToBase`, `iconScale`, and `inset`.
+- Icon mode: edit `lucide`, `lucideWeight`, `textColor`, `contentOpacity`, `contentOffsetX`, `contentOffsetY`, `contentRotation`, `clipContentToBase`, `iconScale`, and `inset`.
+- Image mode: edit/upload/remove `imageData`, `imageName`, `imageWidth`, `imageHeight`, crop fields, `imageRotation`, `imageHue`, `imageContrast`, `imageBrightness`, `imageSilhouette`, `imageSilhouetteColor`, `imageEdgeStroke`, `imageEdgeStrokeColor`, `contentOpacity`, `contentOffsetX`, `contentOffsetY`, `clipContentToBase`, `iconScale`, and `inset`.
 
 Base options:
 
@@ -445,7 +448,7 @@ Movement and resizing options:
 
 Particle corners are encoded by index in share codes:
 
-| Index | Key | Anchor point on base |
+| Index | Key | Anchor point on primary part |
 | --- | --- | --- |
 | `0` | `topLeft` | `(0, 0)` |
 | `1` | `topMiddle` | `(baseWidth / 2, 0)` |
@@ -459,8 +462,8 @@ Particle corners are encoded by index in share codes:
 Particle offsets:
 
 - `offsetX` and `offsetY` are integers clamped to `-120..120`.
-- A missing particle icon becomes a default particle derived from the base.
-- A default particle copies the base, sets `size` to `round(base.size * 0.42)` clamped to `64..220`, sets image/disabled shapes back to `shape`, and sets `backDistance` to `0`.
+- A missing particle icon becomes a default particle derived from the primary part.
+- A default particle copies the primary part, sets `size` to `round(base.size * 0.42)` clamped to `64..220`, sets image/disabled shapes back to `shape`, and sets `backDistance` to `0`.
 
 Particle placement:
 
@@ -478,7 +481,7 @@ function getParticlePlacement(corner, baseDimensions, particleDimensions, offset
 }
 ```
 
-Particles render above the base at `z-index` equivalent priority.
+Particles render above the primary part at `z-index` equivalent priority.
 
 ## Icon Metrics
 
@@ -688,7 +691,7 @@ A renderer can use DOM/CSS, SVG, canvas, or native drawing. The simplest mental 
 
 ```text
 composition stack
-  base icon stack
+  primary part icon stack
     back layer, optional
     main layer
       base surface, optional
@@ -759,7 +762,7 @@ Image content:
 
 ## Composition Bounds and Export Layout
 
-The raw composition coordinate system starts with the base at `(0, 0)`. Back layers and particles can extend outside that rectangle.
+The raw composition coordinate system starts with the primary part at `(0, 0)`. Back layers and particles can extend outside that rectangle.
 
 Bounds:
 
@@ -884,7 +887,7 @@ The app uses:
 
 - Preview safe margin: `24`.
 - Export safe margin: `0`.
-- Default export size: `500 x 500`.
+- Default export size: `640 x 640`.
 - Export scales: `1x`, `2x`, `3x`.
 
 If the composition uses an imported image and the user chooses image-sized export, export dimensions can come from the active image dimensions or crop dimensions. Otherwise export uses the square canvas size.
@@ -983,7 +986,7 @@ function decodeIquan(input) {
     const base = sanitizeIconState(project.base);
     return {
       version: project.version,
-      canvasSize: clamp(parseIntOr(project.canvasSize, 500), 320, 960),
+      canvasSize: clamp(parseIntOr(project.canvasSize, 640), 320, 960),
       base,
       particles: sanitizeParticlesMap(project.particles, base)
     };
@@ -1012,7 +1015,7 @@ function decodeIquan(input) {
 
   return {
     version,
-    canvasSize: clamp(parseIntOr(parsed.c, 500), 320, 960),
+    canvasSize: clamp(parseIntOr(parsed.c, 640), 320, 960),
     base,
     particles
   };
@@ -1088,7 +1091,7 @@ function describeIconState(state) {
 }
 ```
 
-For a particle-heavy composition, the base label is usually enough for inline text. A detailed editor can expose particle labels separately.
+For a particle-heavy composition, the primary part label is usually enough for inline text. A detailed editor can expose particle labels separately.
 
 ## Implementation Checklist
 
@@ -1099,10 +1102,10 @@ To implement iquans in another app:
 3. Expand compact icon fields with the token map.
 4. Merge over the default icon state.
 5. Sanitize every field.
-6. Build base metrics.
+6. Build primary part metrics.
 7. Build particle metrics and placements.
 8. Compute composite bounds.
 9. Process any embedded images, or detect missing images and choose a placeholder/fallback.
-10. Render the base stack and particle stacks.
+10. Render the primary part stack and particle stacks.
 11. For inline text, wrap the rendered composition in a single non-editable inline node sized in `em`.
 12. Preserve the original code on copy/paste and serialization.

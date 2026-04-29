@@ -39,6 +39,7 @@ describe("share codec", () => {
       baseImageCropY: 0.04,
       baseImageCropSize: 0.9,
       contentRotation: -14,
+      clipContentToBase: true,
       fillStops: ["#112233", "#445566"],
       strokeStops: ["#99aabb", "#ccddee"],
       strokeGradientType: "radial",
@@ -71,6 +72,7 @@ describe("share codec", () => {
     expect(decoded.base.baseImageData).toBe(base.baseImageData);
     expect(decoded.base.baseImageName).toBe("shape-image");
     expect(decoded.base.contentRotation).toBe(-14);
+    expect(decoded.base.clipContentToBase).toBe(true);
     expect(decoded.particles.topRight.icon.imageData).toBe(
       "data:image/png;base64,PARTICLE_IMAGE",
     );
@@ -261,7 +263,7 @@ describe("share codec", () => {
     expect(legacyCode.startsWith("IC6|")).toBe(true);
 
     const decoded = decodeState(legacyCode);
-    expect(decoded.canvasSize).toBe(500);
+    expect(decoded.canvasSize).toBe(640);
     expect(decoded.base.mode).toBe("icon");
     expect(decoded.base.lucide).toBe("bell-ring");
     expect(decoded.base.size).toBe(184);
@@ -291,6 +293,17 @@ describe("share codec", () => {
     expect(sanitized.outlineColor).toBe("#ff8844");
     expect(sanitized.strokeStops[0]).toBe("#ff8844");
     expect(sanitized.strokeStops[1]).toBe("#5a2a00");
+  });
+
+  it("defaults text size linking off unless explicitly enabled", () => {
+    expect(sanitizeIconState({ ...DEFAULT_STATE, linkTextToSize: undefined }).linkTextToSize).toBe(
+      false,
+    );
+
+    const linked = sanitizeIconState({ ...DEFAULT_STATE, linkTextToSize: true });
+    const decoded = decodeState(encodeState(linked, {}, 500));
+
+    expect(decoded.base.linkTextToSize).toBe(true);
   });
 
   it("round-trips folder base settings through share codes", () => {

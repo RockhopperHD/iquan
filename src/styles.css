@@ -419,6 +419,17 @@ button {
   box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.25);
 }
 
+.app-header-why {
+  width: auto;
+  min-width: 0;
+  padding: 0 13px;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
 .app-header-spec {
   position: relative;
   isolation: isolate;
@@ -532,10 +543,20 @@ button {
   scroll-padding-bottom: var(--floating-pane-clearance);
   scrollbar-width: thin;
   scrollbar-color: rgba(15, 118, 110, 0.7) rgba(210, 224, 240, 0.8);
+  transition: background 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.app-shell[data-editing-target="particle"] .controls {
+  border-color: rgba(20, 184, 166, 0.72);
+  background:
+    linear-gradient(165deg, rgba(20, 184, 166, 0.095) 0%, rgba(255, 255, 255, 0) 42%),
+    linear-gradient(180deg, rgba(250, 255, 253, 0.98) 0%, rgba(228, 246, 244, 0.96) 100%);
+  box-shadow: inset 0 0 0 1px rgba(20, 184, 166, 0.12);
 }
 
 .app-shell[data-ui-phase="landing"] .controls {
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .controls-content {
@@ -562,7 +583,7 @@ button {
   inset: 0;
   z-index: 3;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   padding: 32px 30px;
   background:
     radial-gradient(circle at 16% 18%, rgba(20, 184, 166, 0.14), transparent 36%),
@@ -577,7 +598,8 @@ button {
 .controls-hero-content {
   max-width: 470px;
   display: grid;
-  gap: 14px;
+  gap: 12px;
+  padding-bottom: 28px;
 }
 
 .controls-hero-eyebrow {
@@ -592,7 +614,7 @@ button {
 .controls-hero h1 {
   margin: 0;
   font-family: var(--display-font);
-  font-size: clamp(44px, 6vw, 64px);
+  font-size: clamp(40px, 5.4vw, 58px);
   line-height: 0.96;
   letter-spacing: -0.05em;
   color: #102033;
@@ -603,7 +625,7 @@ button {
   margin: 0;
   max-width: 36ch;
   color: #4f6177;
-  font-size: 18px;
+  font-size: 17px;
   line-height: 1.55;
 }
 
@@ -614,6 +636,47 @@ button {
   font-size: 14px;
   font-weight: 750;
   line-height: 1.55;
+}
+
+.controls-hero-demo-path {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  counter-reset: demo-step;
+  list-style: none;
+}
+
+.controls-hero-demo-path li {
+  counter-increment: demo-step;
+  min-height: 42px;
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px;
+  border: 1px solid rgba(156, 176, 200, 0.52);
+  border-bottom: 2px solid rgba(142, 164, 190, 0.7);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.74);
+  color: #31485f;
+  font-size: 12px;
+  font-weight: 850;
+  line-height: 1.2;
+}
+
+.controls-hero-demo-path li::before {
+  content: counter(demo-step);
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(15, 118, 110, 0.12);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 950;
 }
 
 .controls-hero-story strong {
@@ -703,9 +766,9 @@ button {
 
 .controls-hero-alternates {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
-  width: min(100%, 390px);
+  width: min(100%, 470px);
 }
 
 .controls-hero-alt-button {
@@ -733,24 +796,30 @@ button {
   letter-spacing: 0.04em;
 }
 
+.landing-template-section {
+  display: grid;
+  gap: 8px;
+}
+
 .starter-template-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 
 .starter-template-card {
-  display: flex;
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
   align-items: center;
-  justify-content: center;
-  min-height: 96px;
-  border-radius: 16px;
+  gap: 10px;
+  min-height: 94px;
+  border-radius: 14px;
   border: 1px solid rgba(156, 176, 200, 0.62);
   border-bottom: 3px solid rgba(142, 164, 190, 0.82);
   background: linear-gradient(180deg, #ffffff 0%, var(--panel-3) 100%);
   color: #33495f;
-  padding: 12px;
-  text-align: center;
+  padding: 10px;
+  text-align: left;
 }
 
 .starter-template-card:hover,
@@ -766,6 +835,28 @@ button {
 
 .starter-template-preview {
   pointer-events: none;
+}
+
+.starter-template-copy {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  pointer-events: none;
+}
+
+.starter-template-copy strong {
+  color: inherit;
+  font-size: 13px;
+  font-weight: 950;
+  line-height: 1.05;
+}
+
+.starter-template-copy span {
+  color: currentColor;
+  opacity: 0.8;
+  font-size: 11px;
+  font-weight: 750;
+  line-height: 1.25;
 }
 
 .app-shell[data-ui-phase="transitioning"] .controls-hero,
@@ -861,6 +952,11 @@ button {
   background: rgba(245, 251, 255, 0.68);
   backdrop-filter: blur(10px) saturate(125%);
   -webkit-backdrop-filter: blur(10px) saturate(125%);
+}
+
+.app-shell[data-editing-target="particle"] .wizard-sticky,
+.app-shell[data-editing-target="particle"] .editor-target-banner {
+  background: rgba(235, 252, 249, 0.72);
 }
 
 .wizard-head {
@@ -1656,6 +1752,15 @@ small {
   flex-wrap: wrap;
   align-items: center;
   gap: 10px;
+}
+
+.field-action-icon {
+  width: 34px;
+  height: 34px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border-radius: 999px;
 }
 
 .image-editor-card {
@@ -3368,6 +3473,20 @@ button.app-header-title-link:active {
   overflow: hidden;
 }
 
+.content-clip-layer {
+  position: absolute;
+  inset: 0 auto auto 0;
+  overflow: hidden;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.content-clip-inner {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
 .particle-layer {
   position: absolute;
   z-index: 20;
@@ -3880,6 +3999,56 @@ button.app-header-title-link:active {
   font-size: clamp(18px, 2.2vw, 22px);
   line-height: 1.55;
   font-weight: 600;
+}
+
+.why-iquan-content {
+  gap: 20px;
+}
+
+.why-iquan-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.why-iquan-grid section {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid rgba(156, 176, 200, 0.58);
+  border-bottom: 3px solid rgba(142, 164, 190, 0.78);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 14% 10%, rgba(20, 184, 166, 0.1), transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(235, 245, 252, 0.92));
+}
+
+.why-iquan-grid h4 {
+  margin: 0;
+  color: #102033;
+  font-size: 15px;
+  font-weight: 950;
+}
+
+.why-iquan-grid p {
+  margin: 0;
+  color: #52677f;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.why-iquan-built {
+  margin: 0;
+  width: fit-content;
+  max-width: 100%;
+  padding: 10px 13px;
+  border-radius: 999px;
+  background: rgba(15, 118, 110, 0.1);
+  color: var(--accent-deep);
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1.35;
 }
 
 .import-export-workspace {
@@ -4806,6 +4975,11 @@ button.app-header-title-link:active {
 
   .controls-hero h1 {
     font-size: 34px;
+  }
+
+  .controls-hero-demo-path,
+  .why-iquan-grid {
+    grid-template-columns: 1fr;
   }
 
   .controls-hero-alternates {

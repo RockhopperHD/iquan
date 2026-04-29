@@ -4,6 +4,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Clipboard,
+  Crosshair,
   Download,
   PenLine,
   Plus,
@@ -46,8 +47,8 @@ const SHARE_CODE_VERSION = "IC11";
 const PROJECT_FILE_VERSION = "IQP1";
 const PARTICLE_OFFSET_LIMIT = 120;
 const PARTICLE_EDIT_ZOOM = 1.65;
-const DEFAULT_CANVAS_SIZE = 500;
-const EXPORT_CANVAS_SIZE = 500;
+const DEFAULT_CANVAS_SIZE = 640;
+const EXPORT_CANVAS_SIZE = DEFAULT_CANVAS_SIZE;
 const CANVAS_SIZE_MIN = 320;
 const CANVAS_SIZE_MAX = 960;
 const ICON_BASE_SIZE_MIN = 64;
@@ -62,10 +63,9 @@ const PREVIEW_SAFE_MARGIN = 24;
 const EXPORT_SAFE_MARGIN = 0;
 const EXPORT_SCALE_OPTIONS = [1, 2, 3];
 const DEFAULT_EXPORT_SCALE = 1;
-const CANVAS_SIZE_PRESETS = [400, 500, 640];
 const DEFAULT_PREVIEW_CONTEXT_MODE = "surfaces";
 const HERO_DESCRIPTION =
-  "Make tiny polished icons for chats, docs, and lightweight UI work without opening a full design tool.";
+  "Create tiny, reusable visual assets for chats, docs, status badges, lightweight UI, and other apps.";
 const LANDING_TO_BUILDER_MS = 1100;
 const HERO_SAMPLE_SWAP_MS = 3000;
 const HERO_SAMPLE_SWAP_DELAY_MS = 1200;
@@ -149,7 +149,7 @@ const DEFAULT_STATE = {
   folderTabWidth: 34,
   folderTabHeight: 20,
   fontSize: 78,
-  linkTextToSize: true,
+  linkTextToSize: false,
   spacing: 0,
   fontFamily: "Inter, system-ui, sans-serif",
   fontWeight: "700",
@@ -167,6 +167,7 @@ const DEFAULT_STATE = {
   contentOffsetX: 0,
   contentOffsetY: 0,
   contentRotation: 0,
+  clipContentToBase: false,
   shapeOffsetX: 0,
   shapeOffsetY: 0,
   outlineColor: "#d6deed",
@@ -257,6 +258,8 @@ const ADVANCED_HELP = {
   fontWeight: "Adjusts the thickness of text characters in text mode.",
   lucideWeight: "Adjusts icon stroke thickness in icon mode.",
   iconScale: "Scales the active content within the base shape (100% matches the current base size).",
+  clipContentToBase:
+    "Hides any part of the content that falls outside the active base.",
   baseSize:
     "Sets the size of the active icon base. When editing a particle, this changes that particle's base size.",
   letterSpacing: "Adds horizontal spacing between text characters.",
@@ -326,7 +329,7 @@ const WIZARD_WALKTHROUGH_STEPS = [
     wizardStepId: "particles",
     target: "wizard-particles-card",
     title: "Attach particles",
-    body: "Particles are smaller iquans anchored around the base. Pick a slot here, then refine the particle in the full editor.",
+    body: "Particles are smaller iquans anchored around the primary part. Pick a slot here, then refine the particle in the full editor.",
   },
   {
     id: "share",
@@ -336,6 +339,14 @@ const WIZARD_WALKTHROUGH_STEPS = [
     body: "Finish here by exporting a PNG, copying a share link, saving a project, or opening the full editor for more control.",
   },
 ];
+const LANDING_DEMO_STEPS = [
+  "Start from a preset",
+  "Customize text, icons, images, color, and particles",
+  "Preview where it will live",
+  "Export, share, or hand the spec to Codex",
+];
+const SAMPLE_IMAGE_DATA =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='18' x2='238' y1='20' y2='236' gradientUnits='userSpaceOnUse'%3E%3Cstop stop-color='%23fef3c7'/%3E%3Cstop offset='.48' stop-color='%23a7f3d0'/%3E%3Cstop offset='1' stop-color='%2393c5fd'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='256' height='256' rx='58' fill='url(%23g)'/%3E%3Ccircle cx='92' cy='94' r='32' fill='%23ffffff' fill-opacity='.72'/%3E%3Cpath d='M42 198c28-45 53-60 76-43 14 10 25 8 38-8 20-25 42-21 62 14v37H42Z' fill='%230f766e' fill-opacity='.68'/%3E%3Cpath d='M49 51h158v154H49z' fill='none' stroke='%23102033' stroke-width='10' stroke-linejoin='round' stroke-opacity='.16'/%3E%3C/svg%3E";
 const HERO_SAMPLE_BLUEPRINTS = [
   {
     key: "sparkles-circle",
@@ -1004,9 +1015,9 @@ const HERO_SAMPLE_BLUEPRINTS = [
 const STARTER_TEMPLATES = [
   {
     id: "ok-reply",
-    title: "OK Reply",
-    description: "A clear affirmative reaction for texts and quick replies.",
-    canvasSize: 500,
+    title: "Quick Yes",
+    description: "A short reply sticker for chat, approvals, and notes.",
+    canvasSize: 640,
     base: {
       mode: "text",
       content: "OK",
@@ -1027,9 +1038,9 @@ const STARTER_TEMPLATES = [
   },
   {
     id: "x-reply",
-    title: "X Reply",
-    description: "A simple no / cancel reaction that reads at tiny sizes.",
-    canvasSize: 500,
+    title: "Quick No",
+    description: "A clear cancel or not-now reaction for small spaces.",
+    canvasSize: 640,
     base: {
       mode: "text",
       content: "X",
@@ -1049,9 +1060,9 @@ const STARTER_TEMPLATES = [
   },
   {
     id: "smile-reaction",
-    title: "Smile",
-    description: "A friendly smiley for warm reactions and group chats.",
-    canvasSize: 500,
+    title: "Good Mood",
+    description: "A warm reaction sticker with a simple icon center.",
+    canvasSize: 640,
     base: {
       mode: "icon",
       lucide: "smile",
@@ -1066,6 +1077,252 @@ const STARTER_TEMPLATES = [
       backColor: "#fde68a",
       backDistance: 10,
       backAngle: 32,
+    },
+  },
+  {
+    id: "project-status",
+    title: "Done Badge",
+    description: "A checked status mark with a small notification dot.",
+    canvasSize: 640,
+    base: {
+      mode: "icon",
+      lucide: "badge-check",
+      lucideWeight: 1.8,
+      shape: "circle",
+      size: 170,
+      iconScale: 58,
+      fillStops: ["#ecfeff", "#cffafe"],
+      strokeStops: ["#06b6d4"],
+      textColor: "#0e7490",
+      outline: 5,
+      backColor: "#67e8f9",
+      backDistance: 8,
+      backAngle: 28,
+    },
+    particles: {
+      bottomRight: createDefaultParticle(
+        sanitizeIconState({
+          ...DEFAULT_STATE,
+          mode: "text",
+          content: "1",
+          shape: "circle",
+          size: 58,
+          fontSize: 34,
+          fontWeight: "900",
+          fillStops: ["#fff1f2", "#fecdd3"],
+          strokeStops: ["#fb7185"],
+          textColor: "#e11d48",
+          outline: 3,
+        }),
+        "bottomRight",
+      ),
+    },
+  },
+  {
+    id: "folder-label",
+    title: "Folder Tab",
+    description: "A labeled folder shape for docs, files, and projects.",
+    canvasSize: 640,
+    base: {
+      mode: "text",
+      content: "AI",
+      shape: "folder",
+      size: 178,
+      widthScale: 148,
+      heightScale: 92,
+      folderTabX: 12,
+      folderTabWidth: 44,
+      folderTabHeight: 25,
+      radius: 20,
+      fontSize: 58,
+      fontWeight: "900",
+      fillStops: ["#fef3c7", "#fdba74"],
+      strokeStops: ["#c2410c"],
+      textColor: "#7c2d12",
+      outline: 5,
+      backColor: "#fb923c",
+      backDistance: 8,
+      backAngle: 20,
+    },
+  },
+  {
+    id: "profile-sticker",
+    title: "Profile Mark",
+    description: "A compact monogram for profiles and personal labels.",
+    canvasSize: 640,
+    base: {
+      mode: "text",
+      content: "me",
+      shape: "square",
+      size: 168,
+      radius: 34,
+      fontSize: 60,
+      fontWeight: "900",
+      fillStops: ["#f5f3ff", "#ddd6fe"],
+      strokeStops: ["#8b5cf6"],
+      textColor: "#5b21b6",
+      outline: 5,
+      backColor: "#c4b5fd",
+      backDistance: 10,
+      backAngle: 34,
+    },
+  },
+  {
+    id: "app-icon",
+    title: "App Tile",
+    description: "A rounded-square symbol for apps, tools, and shortcuts.",
+    canvasSize: 640,
+    base: {
+      mode: "icon",
+      lucide: "sparkles",
+      lucideWeight: 1.4,
+      shape: "square",
+      size: 176,
+      radius: 38,
+      iconScale: 58,
+      fillStops: ["#f8fafc", "#dbeafe"],
+      strokeStops: ["#111827"],
+      textColor: "#0f766e",
+      outline: 6,
+      backColor: "#94a3b8",
+      backDistance: 10,
+      backAngle: 34,
+    },
+  },
+  {
+    id: "image-sticker",
+    title: "Photo Cutout",
+    description: "An image-backed sticker with crop, edge, and base styling.",
+    canvasSize: 640,
+    base: {
+      mode: "image",
+      imageData: SAMPLE_IMAGE_DATA,
+      imageName: "sample-sticker",
+      imageWidth: 256,
+      imageHeight: 256,
+      imageCropEnabled: true,
+      imageCropX: 0,
+      imageCropY: 0,
+      imageCropSize: 1,
+      imageEdgeStroke: 8,
+      imageEdgeStrokeColor: "#ffffff",
+      shape: "circle",
+      size: 176,
+      iconScale: 78,
+      fillStops: ["#ecfeff", "#ccfbf1"],
+      strokeStops: ["#0f766e"],
+      outline: 5,
+      backColor: "#5eead4",
+      backDistance: 9,
+      backAngle: 30,
+    },
+  },
+  {
+    id: "class-project-badge",
+    title: "Top Pick",
+    description: "A bold badge for featured items, scores, and highlights.",
+    canvasSize: 640,
+    base: {
+      mode: "text",
+      content: "A+",
+      shape: "circle",
+      size: 172,
+      iconScale: 88,
+      fontSize: 72,
+      fontWeight: "900",
+      fillStops: ["#ecfdf5", "#bbf7d0"],
+      strokeStops: ["#22c55e"],
+      textColor: "#15803d",
+      outline: 6,
+      backColor: "#86efac",
+      backDistance: 10,
+      backAngle: 34,
+    },
+  },
+  {
+    id: "team-reply",
+    title: "Team Ping",
+    description: "A message sticker with an alert particle for quick replies.",
+    canvasSize: 640,
+    base: {
+      mode: "icon",
+      lucide: "message-circle-more",
+      lucideWeight: 1.4,
+      shape: "pill",
+      size: 168,
+      iconScale: 54,
+      pillWidthScale: 198,
+      pillHeightScale: 78,
+      fillStops: ["#ecfeff", "#a5f3fc"],
+      strokeStops: ["#22d3ee"],
+      textColor: "#0891b2",
+      outline: 5,
+      backColor: "#67e8f9",
+      backDistance: 9,
+      backAngle: 24,
+    },
+    particles: {
+      topLeft: createDefaultParticle(
+        sanitizeIconState({
+          ...DEFAULT_STATE,
+          mode: "text",
+          content: "!",
+          shape: "circle",
+          size: 62,
+          fontSize: 40,
+          fontWeight: "900",
+          fillStops: ["#fff1f2", "#fecdd3"],
+          strokeStops: ["#fb7185"],
+          textColor: "#e11d48",
+          outline: 3,
+        }),
+        "topLeft",
+      ),
+    },
+  },
+  {
+    id: "doc-sticker",
+    title: "Doc Marker",
+    description: "A rectangular tag for notes, handoffs, and documentation.",
+    canvasSize: 640,
+    base: {
+      mode: "icon",
+      lucide: "notebook-pen",
+      lucideWeight: 1.7,
+      shape: "rectangle",
+      size: 170,
+      iconScale: 52,
+      widthScale: 182,
+      radius: 22,
+      fillStops: ["#fff7ed", "#ffedd5"],
+      strokeStops: ["#c2410c"],
+      textColor: "#9a3412",
+      outline: 5,
+      backColor: "#fdba74",
+      backDistance: 8,
+      backAngle: 18,
+    },
+  },
+  {
+    id: "product-status",
+    title: "Live Status",
+    description: "A compact activity badge for state, health, or readiness.",
+    canvasSize: 640,
+    base: {
+      mode: "icon",
+      lucide: "activity",
+      lucideWeight: 2.2,
+      shape: "square",
+      size: 166,
+      radius: 30,
+      iconScale: 58,
+      fillStops: ["#f8fafc", "#e0f2fe"],
+      strokeStops: ["#0284c7"],
+      textColor: "#0369a1",
+      outline: 5,
+      backColor: "#7dd3fc",
+      backDistance: 8,
+      backAngle: 38,
     },
   },
 ];
@@ -1105,6 +1362,7 @@ const COMPACT_ICON_FIELDS = [
   ["contentOffsetX", "cox"],
   ["contentOffsetY", "coy"],
   ["contentRotation", "cr"],
+  ["clipContentToBase", "ctb"],
   ["shapeOffsetX", "sox"],
   ["shapeOffsetY", "soy"],
   ["strokeStops", "o"],
@@ -1156,6 +1414,10 @@ const COMPACT_TOKEN_TO_ICON_FIELD = Object.fromEntries(
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
+}
+
+function clampRoundedPixel(value, min, max) {
+  return clamp(Math.round(value), min, max);
 }
 
 function getWalkthroughCardPosition(rect) {
@@ -2129,7 +2391,7 @@ function sanitizeIconState(value) {
       42,
     ),
     fontSize: clamp(parseIntOr(source.fontSize, DEFAULT_STATE.fontSize), 16, 180),
-    linkTextToSize: source.linkTextToSize !== false,
+    linkTextToSize: source.linkTextToSize === true,
     spacing: clamp(parseIntOr(source.spacing, DEFAULT_STATE.spacing), 0, 20),
     fontFamily: String(source.fontFamily ?? DEFAULT_STATE.fontFamily),
     fontWeight: String(
@@ -2175,12 +2437,12 @@ function sanitizeIconState(value) {
       0,
       100,
     ),
-    contentOffsetX: clamp(
+    contentOffsetX: clampRoundedPixel(
       parseFloatOr(source.contentOffsetX, DEFAULT_STATE.contentOffsetX),
       -PART_OFFSET_LIMIT,
       PART_OFFSET_LIMIT,
     ),
-    contentOffsetY: clamp(
+    contentOffsetY: clampRoundedPixel(
       parseFloatOr(source.contentOffsetY, DEFAULT_STATE.contentOffsetY),
       -PART_OFFSET_LIMIT,
       PART_OFFSET_LIMIT,
@@ -2190,12 +2452,13 @@ function sanitizeIconState(value) {
       CONTENT_ROTATION_MIN,
       CONTENT_ROTATION_MAX,
     ),
-    shapeOffsetX: clamp(
+    clipContentToBase: source.clipContentToBase === true,
+    shapeOffsetX: clampRoundedPixel(
       parseFloatOr(source.shapeOffsetX, DEFAULT_STATE.shapeOffsetX),
       -PART_OFFSET_LIMIT,
       PART_OFFSET_LIMIT,
     ),
-    shapeOffsetY: clamp(
+    shapeOffsetY: clampRoundedPixel(
       parseFloatOr(source.shapeOffsetY, DEFAULT_STATE.shapeOffsetY),
       -PART_OFFSET_LIMIT,
       PART_OFFSET_LIMIT,
@@ -2460,11 +2723,23 @@ function getCornerLabel(cornerKey) {
   return PARTICLE_CORNERS.find((corner) => corner.key === cornerKey)?.label || cornerKey;
 }
 
+function getEditorTargetLabel(target) {
+  return target?.type === "particle" ? `${getCornerLabel(target.corner)} Particle` : "Primary Part";
+}
+
 function sanitizeParticle(value, baseIcon) {
   const next = value || {};
   return {
-    offsetX: clamp(parseIntOr(next.offsetX, 0), -PARTICLE_OFFSET_LIMIT, PARTICLE_OFFSET_LIMIT),
-    offsetY: clamp(parseIntOr(next.offsetY, 0), -PARTICLE_OFFSET_LIMIT, PARTICLE_OFFSET_LIMIT),
+    offsetX: clampRoundedPixel(
+      parseFloatOr(next.offsetX, 0),
+      -PARTICLE_OFFSET_LIMIT,
+      PARTICLE_OFFSET_LIMIT,
+    ),
+    offsetY: clampRoundedPixel(
+      parseFloatOr(next.offsetY, 0),
+      -PARTICLE_OFFSET_LIMIT,
+      PARTICLE_OFFSET_LIMIT,
+    ),
     icon: sanitizeIconState(next.icon || createDefaultParticleIcon(baseIcon)),
   };
 }
@@ -2605,7 +2880,7 @@ function decodeLegacyIconState(code) {
       16,
       180,
     ),
-    linkTextToSize: hasTextLinkSetting ? parts[22] !== "0" : DEFAULT_STATE.linkTextToSize,
+    linkTextToSize: hasTextLinkSetting ? parts[22] === "1" : DEFAULT_STATE.linkTextToSize,
     spacing: clamp(parseIntOr(parts[hasLucideWeight ? 10 : 9], DEFAULT_STATE.spacing), 0, 20),
     fontFamily: decodeURIComponent(parts[hasLucideWeight ? 11 : 10] || DEFAULT_STATE.fontFamily),
     fontWeight: parts[hasLucideWeight ? 12 : 11] || DEFAULT_STATE.fontWeight,
@@ -3015,28 +3290,6 @@ function decodeProjectOrShareInput(input) {
   return decodeState(resolvedCode);
 }
 
-const IQUAN_LOGO_CODE = encodeState(
-  sanitizeIconState({
-    ...DEFAULT_STATE,
-    mode: "text",
-    content: "iq",
-    shape: "square",
-    size: 172,
-    radius: 34,
-    fontSize: 58,
-    fontWeight: "900",
-    fillStops: ["#f8fafc", "#dbeafe"],
-    strokeStops: ["#111827"],
-    textColor: "#111827",
-    outline: 7,
-    backColor: "#94a3b8",
-    backDistance: 10,
-    backAngle: 35,
-  }),
-  {},
-  DEFAULT_CANVAS_SIZE,
-);
-
 function getIconVisualBounds(iconState, metrics) {
   const visibleBounds = [];
 
@@ -3054,12 +3307,24 @@ function getIconVisualBounds(iconState, metrics) {
     : null;
 
   if (contentBounds) {
-    visibleBounds.push({
+    const rawContentBounds = {
       minX: contentBounds.left,
       minY: contentBounds.top,
       maxX: contentBounds.left + contentBounds.width,
       maxY: contentBounds.top + contentBounds.height,
-    });
+    };
+    const visibleContentBounds = shouldClipContentToBase(iconState)
+      ? getBoundsIntersection(rawContentBounds, {
+          minX: iconState.shapeOffsetX,
+          minY: iconState.shapeOffsetY,
+          maxX: iconState.shapeOffsetX + metrics.dimensions.width,
+          maxY: iconState.shapeOffsetY + metrics.dimensions.height,
+        })
+      : rawContentBounds;
+
+    if (visibleContentBounds) {
+      visibleBounds.push(visibleContentBounds);
+    }
   }
 
   if (isInspectPartVisible(iconState, "back")) {
@@ -3180,7 +3445,7 @@ function getInspectTargetId(target, part) {
 
 function getInspectTargetDisplayName(target, part) {
   const ownerLabel =
-    target.type === "particle" ? `${getCornerLabel(target.corner)} particle` : "Base";
+    target.type === "particle" ? `${getCornerLabel(target.corner)} particle` : "Primary part";
   const partLabel = INSPECT_PARTS.find((option) => option.id === part)?.label || "Part";
   return `${ownerLabel} ${partLabel.toLowerCase()}`;
 }
@@ -3271,6 +3536,24 @@ function getInspectPartBounds(iconState, metrics, part) {
     height: metrics.dimensions.height,
     radius: metrics.borderRadius,
   };
+}
+
+function getBoundsIntersection(first, second) {
+  if (!first || !second) return null;
+  const minX = Math.max(first.minX, second.minX);
+  const minY = Math.max(first.minY, second.minY);
+  const maxX = Math.min(first.maxX, second.maxX);
+  const maxY = Math.min(first.maxY, second.maxY);
+  if (maxX <= minX || maxY <= minY) return null;
+  return { minX, minY, maxX, maxY };
+}
+
+function shouldClipContentToBase(iconState) {
+  return (
+    iconState.clipContentToBase === true &&
+    iconState.shapeEnabled &&
+    iconState.shape !== "none"
+  );
 }
 
 function buildInspectTargetsForIcon(target, iconState, metrics) {
@@ -3591,8 +3874,8 @@ function ContentZoneControl({ iconState, metrics, onChange, onReset }) {
 
   const applyOffset = (x, y) => {
     onChange(
-      clamp(Number(x.toFixed(2)), -maxOffsetX, maxOffsetX),
-      clamp(Number(y.toFixed(2)), -maxOffsetY, maxOffsetY),
+      clampRoundedPixel(x, -Math.round(maxOffsetX), Math.round(maxOffsetX)),
+      clampRoundedPixel(y, -Math.round(maxOffsetY), Math.round(maxOffsetY)),
     );
   };
 
@@ -4968,6 +5251,49 @@ function IconFace({ iconState, metrics }) {
   );
 }
 
+function ContentClipLayer({ iconState, metrics }) {
+  if (!shouldClipContentToBase(iconState)) {
+    return <IconFace iconState={iconState} metrics={metrics} />;
+  }
+
+  const isFolder = iconState.shape === "folder";
+  const folderPath = isFolder
+    ? getFolderPath(
+        metrics.dimensions.width,
+        metrics.dimensions.height,
+        metrics.borderRadius,
+        iconState.folderTabX,
+        iconState.folderTabWidth,
+        iconState.folderTabHeight,
+        metrics.visibleOutline / 2,
+      )
+    : "";
+  const clipPath = folderPath ? `path("${folderPath}")` : undefined;
+
+  return (
+    <div
+      className="content-clip-layer"
+      style={{
+        width: `${metrics.dimensions.width}px`,
+        height: `${metrics.dimensions.height}px`,
+        borderRadius: isFolder ? 0 : `${metrics.borderRadius}px`,
+        transform: `translate(${iconState.shapeOffsetX}px, ${iconState.shapeOffsetY}px)`,
+        clipPath,
+        WebkitClipPath: clipPath,
+      }}
+    >
+      <div
+        className="content-clip-inner"
+        style={{
+          transform: `translate(${-iconState.shapeOffsetX}px, ${-iconState.shapeOffsetY}px)`,
+        }}
+      >
+        <IconFace iconState={iconState} metrics={metrics} />
+      </div>
+    </div>
+  );
+}
+
 function IconLayers({ iconState, metrics, className = "" }) {
   const isFolder = iconState.shapeEnabled && iconState.shape === "folder";
 
@@ -5022,7 +5348,7 @@ function IconLayers({ iconState, metrics, className = "" }) {
             ) : null}
           </div>
         ) : null}
-        <IconFace iconState={iconState} metrics={metrics} />
+        <ContentClipLayer iconState={iconState} metrics={metrics} />
       </div>
     </>
   );
@@ -5063,6 +5389,8 @@ function InspectHitTarget({
       pointerId: event.pointerId,
       lastX: event.clientX,
       lastY: event.clientY,
+      remainderX: 0,
+      remainderY: 0,
       mode,
       handle,
       moved: false,
@@ -5089,7 +5417,15 @@ function InspectHitTarget({
       return;
     }
 
-    onDragInspectPart?.(target, deltaX, deltaY);
+    const totalDeltaX = active.remainderX + deltaX;
+    const totalDeltaY = active.remainderY + deltaY;
+    const appliedDeltaX = Math.trunc(totalDeltaX);
+    const appliedDeltaY = Math.trunc(totalDeltaY);
+    active.remainderX = totalDeltaX - appliedDeltaX;
+    active.remainderY = totalDeltaY - appliedDeltaY;
+    if (appliedDeltaX === 0 && appliedDeltaY === 0) return;
+
+    onDragInspectPart?.(target, appliedDeltaX, appliedDeltaY);
   };
 
   const finishInteraction = (event) => {
@@ -5464,10 +5800,14 @@ function StarterTemplateButton({ template, onClick }) {
       <StaticCompositionPreview
         baseState={baseState}
         particles={particles}
-        targetSize={72}
+        targetSize={54}
         padding={4}
         className="starter-template-preview"
       />
+      <span className="starter-template-copy">
+        <strong>{template.title}</strong>
+        <span>{template.description}</span>
+      </span>
     </button>
   );
 }
@@ -6059,12 +6399,13 @@ function App() {
   });
   const [baseState, setBaseState] = useState(DEFAULT_STATE);
   const [particles, setParticles] = useState({});
-  const [canvasSize, setCanvasSize] = useState(DEFAULT_CANVAS_SIZE);
+  const canvasSize = DEFAULT_CANVAS_SIZE;
   const [editorTarget, setEditorTarget] = useState({ type: "base" });
   const [loadCode, setLoadCode] = useState("");
   const [toast, setToast] = useState("");
   const [isShareOpen, setShareOpen] = useState(false);
   const [isInfoOpen, setInfoOpen] = useState(false);
+  const [isAboutOpen, setAboutOpen] = useState(false);
   const [isSpecOpen, setSpecOpen] = useState(false);
   const [hasOpenedSpecModal, setHasOpenedSpecModal] = useState(() => {
     if (typeof window === "undefined") return false;
@@ -6155,7 +6496,6 @@ function App() {
   const applyHistorySnapshot = (snapshot) => {
     setBaseState(snapshot.baseState);
     setParticles(snapshot.particles);
-    setCanvasSize(snapshot.canvasSize);
     setEditorTarget(snapshot.editorTarget || { type: "base" });
   };
 
@@ -6163,6 +6503,8 @@ function App() {
     editorTarget.type === "particle" ? particles[editorTarget.corner] : null;
   const isEditingParticle = Boolean(activeParticle);
   const state = isEditingParticle ? activeParticle.icon : baseState;
+  const editorTargetLabel = getEditorTargetLabel(editorTarget);
+  const editorTargetContextLabel = `of ${editorTargetLabel}`;
   const editorStateKey = isEditingParticle ? `particle:${editorTarget.corner}` : "base";
   const contentSizeLabel = isEditingParticle ? "Content size in particle base" : "Content size in base";
   const currentBaseLabel = isEditingParticle ? "particle base" : "base";
@@ -6383,10 +6725,24 @@ function App() {
     hasOpenedSpecModal || isSpecOpen
       ? "app-header-spec"
       : "app-header-spec app-header-spec-needs-attention";
-  const wizardStep = WIZARD_STEPS[wizardStepIndex] || WIZARD_STEPS[0];
-  const wizardStepNumber = wizardStepIndex + 1;
-  const canGoBackInWizard = wizardStepIndex > 0;
-  const canGoForwardInWizard = wizardStepIndex < WIZARD_STEPS.length - 1;
+  const visibleWizardSteps = isEditingParticle
+    ? WIZARD_STEPS.filter((step) => step.id !== "particles")
+    : WIZARD_STEPS;
+  const currentWizardStepId = WIZARD_STEPS[wizardStepIndex]?.id || WIZARD_STEPS[0].id;
+  const wizardStep =
+    visibleWizardSteps.find((step) => step.id === currentWizardStepId) ||
+    visibleWizardSteps[0] ||
+    WIZARD_STEPS[0];
+  const wizardVisibleStepIndex = Math.max(
+    0,
+    visibleWizardSteps.findIndex((step) => step.id === wizardStep.id),
+  );
+  const wizardStepNumber = wizardVisibleStepIndex + 1;
+  const wizardStepTitle = ["content", "base", "back"].includes(wizardStep.id)
+    ? `${wizardStep.title} ${editorTargetContextLabel}`
+    : wizardStep.title;
+  const canGoBackInWizard = wizardVisibleStepIndex > 0;
+  const canGoForwardInWizard = wizardVisibleStepIndex < visibleWizardSteps.length - 1;
   const walkthroughStep =
     WIZARD_WALKTHROUGH_STEPS[walkthroughStepIndex] || WIZARD_WALKTHROUGH_STEPS[0];
   const walkthroughStepNumber = walkthroughStepIndex + 1;
@@ -6399,6 +6755,11 @@ function App() {
     const timer = window.setTimeout(() => setToast(""), 1600);
     return () => window.clearTimeout(timer);
   }, [toast]);
+
+  useEffect(() => {
+    if (!isEditingParticle || currentWizardStepId !== "particles") return;
+    setWizardStepIndex(WIZARD_STEPS.findIndex((step) => step.id === "content"));
+  }, [currentWizardStepId, isEditingParticle]);
 
   useEffect(() => {
     if (!isWalkthroughActive || !walkthroughStep) return;
@@ -6514,7 +6875,6 @@ function App() {
       setLoadCode(hydration.shareCode);
       setBaseState(hydration.decoded.base);
       setParticles(hydration.decoded.particles);
-      setCanvasSize(hydration.decoded.canvasSize);
       setEditorTarget({ type: "base" });
       if (pageMode === "copiedLink") {
         setSharePageStatus(hydration.missingSharedImages ? "unsupported-images" : "valid");
@@ -6752,6 +7112,7 @@ function App() {
     setWizardStepIndex(0);
     setPreviewContextMode(DEFAULT_PREVIEW_CONTEXT_MODE);
     setInfoOpen(false);
+    setAboutOpen(false);
     setSpecOpen(false);
     setShareOpen(false);
     setIconPickerOpen(false);
@@ -6786,7 +7147,6 @@ function App() {
       controlsRef.current.scrollTop = 0;
       controlsRef.current.scrollLeft = 0;
     }
-    setEditorTarget({ type: "base" });
     setWorkspaceMode("wizard");
     setUiPhase("builder");
     if (walkthroughRequested) {
@@ -6795,18 +7155,24 @@ function App() {
   };
 
   const handleWizardBack = () => {
-    setWizardStepIndex((index) => Math.max(0, index - 1));
+    const previousStep = visibleWizardSteps[wizardVisibleStepIndex - 1];
+    if (previousStep) {
+      setWizardStepIndex(WIZARD_STEPS.findIndex((step) => step.id === previousStep.id));
+    }
     controlsRef.current?.scrollTo({ top: 0, left: 0, behavior: "smooth" });
   };
 
   const handleWizardNext = () => {
-    setWizardStepIndex((index) => Math.min(WIZARD_STEPS.length - 1, index + 1));
+    const nextStep = visibleWizardSteps[wizardVisibleStepIndex + 1];
+    if (nextStep) {
+      setWizardStepIndex(WIZARD_STEPS.findIndex((step) => step.id === nextStep.id));
+    }
     controlsRef.current?.scrollTo({ top: 0, left: 0, behavior: "smooth" });
   };
 
   const handleWizardParticleAdd = (cornerKey) => {
     handleCornerAddOrSelect(cornerKey);
-    setWorkspaceMode("editor");
+    setWizardStepIndex(WIZARD_STEPS.findIndex((step) => step.id === "content"));
     setUiPhase("builder");
   };
 
@@ -7007,6 +7373,7 @@ function App() {
       // Ignore storage failures; the in-memory state still stops the prompt for this session.
     }
     setInfoOpen(false);
+    setAboutOpen(false);
     setSpecOpen(true);
   };
 
@@ -7061,23 +7428,10 @@ function App() {
   const applyDecodedComposition = (next, options = {}) => {
     setBaseState(next.base);
     setParticles(next.particles);
-    setCanvasSize(next.canvasSize);
     setEditorTarget({ type: "base" });
-    setLoadCode(options.loadCode ?? encodeState(next.base, next.particles, next.canvasSize));
+    setLoadCode(options.loadCode ?? encodeState(next.base, next.particles, DEFAULT_CANVAS_SIZE));
     setShareOpen(false);
     setToast(options.toast || "Project loaded");
-  };
-
-  const handleLoadIquanLogo = () => {
-    try {
-      const next = decodeState(IQUAN_LOGO_CODE);
-      applyDecodedComposition(next, {
-        loadCode: IQUAN_LOGO_CODE,
-        toast: "Loaded iquan logo",
-      });
-    } catch {
-      setToast("Could not load iquan logo");
-    }
   };
 
   const handleLoadCode = () => {
@@ -7086,7 +7440,7 @@ function App() {
       const isProjectFile = trimmed.startsWith("{");
       const next = decodeProjectOrShareInput(trimmed);
       applyDecodedComposition(next, {
-        loadCode: isProjectFile ? encodeState(next.base, next.particles, next.canvasSize) : resolveShareCodeInput(trimmed),
+        loadCode: isProjectFile ? encodeState(next.base, next.particles, DEFAULT_CANVAS_SIZE) : resolveShareCodeInput(trimmed),
         toast: isProjectFile ? "Project loaded" : "Code loaded",
       });
       if (uiPhase === "landing") {
@@ -7132,7 +7486,7 @@ function App() {
       const text = await file.text();
       const next = decodeProjectPayload(text);
       applyDecodedComposition(next, {
-        loadCode: encodeState(next.base, next.particles, next.canvasSize),
+        loadCode: encodeState(next.base, next.particles, DEFAULT_CANVAS_SIZE),
         toast: "Project file imported",
       });
     } catch (error) {
@@ -7370,10 +7724,6 @@ function App() {
     });
   };
 
-  const handleCanvasSizeChange = (nextSize) => {
-    setCanvasSize(clamp(nextSize, CANVAS_SIZE_MIN, CANVAS_SIZE_MAX));
-  };
-
   const handleBackLayerChange = (backDistance, backAngle) => {
     updateActiveState((current) => ({
       ...current,
@@ -7388,12 +7738,12 @@ function App() {
     setParticles((current) => {
       const targetParticle = current[cornerKey];
       if (!targetParticle) return current;
-      const safeOffsetX = clamp(
+      const safeOffsetX = clampRoundedPixel(
         parseFloatOr(nextOffsetX, targetParticle.offsetX),
         -PARTICLE_OFFSET_LIMIT,
         PARTICLE_OFFSET_LIMIT,
       );
-      const safeOffsetY = clamp(
+      const safeOffsetY = clampRoundedPixel(
         parseFloatOr(nextOffsetY, targetParticle.offsetY),
         -PARTICLE_OFFSET_LIMIT,
         PARTICLE_OFFSET_LIMIT,
@@ -7423,11 +7773,12 @@ function App() {
   const handleResetBuilder = () => {
     setBaseState(DEFAULT_STATE);
     setParticles({});
-    setCanvasSize(DEFAULT_CANVAS_SIZE);
     setEditorTarget({ type: "base" });
     setLoadCode("");
     setShareOpen(false);
     setInfoOpen(false);
+    setAboutOpen(false);
+    setSpecOpen(false);
     setIconPickerOpen(false);
     setFontPickerOpen(false);
     setSelectMenuOpen(false);
@@ -7449,7 +7800,6 @@ function App() {
     const nextBase = sanitizeIconState({ ...DEFAULT_STATE, ...template.base });
     setBaseState(nextBase);
     setParticles(sanitizeParticlesMap(template.particles, nextBase));
-    setCanvasSize(template.canvasSize || DEFAULT_CANVAS_SIZE);
     setEditorTarget({ type: "base" });
     setWorkspaceMode("wizard");
     setWizardStepIndex(0);
@@ -7527,8 +7877,16 @@ function App() {
           ...current,
           [selection.target.corner]: {
             ...targetParticle,
-            offsetX: clamp(targetParticle.offsetX + deltaX, -PARTICLE_OFFSET_LIMIT, PARTICLE_OFFSET_LIMIT),
-            offsetY: clamp(targetParticle.offsetY + deltaY, -PARTICLE_OFFSET_LIMIT, PARTICLE_OFFSET_LIMIT),
+            offsetX: clampRoundedPixel(
+              targetParticle.offsetX + deltaX,
+              -PARTICLE_OFFSET_LIMIT,
+              PARTICLE_OFFSET_LIMIT,
+            ),
+            offsetY: clampRoundedPixel(
+              targetParticle.offsetY + deltaY,
+              -PARTICLE_OFFSET_LIMIT,
+              PARTICLE_OFFSET_LIMIT,
+            ),
           },
         };
       });
@@ -7654,7 +8012,6 @@ function App() {
       controlsRef.current.scrollTop = 0;
       controlsRef.current.scrollLeft = 0;
     }
-    setWorkspaceMode("editor");
     setUiPhase("builder");
     setSelectMenuOpen(false);
     setHighlightedInspectId("");
@@ -7731,9 +8088,9 @@ function App() {
         <div className="wizard-head">
           <div>
             <p className="wizard-kicker">
-              Step {wizardStepNumber} of {WIZARD_STEPS.length}
+              Step {wizardStepNumber} of {visibleWizardSteps.length}
             </p>
-            <h2>{wizardStep.title}</h2>
+            <h2>{wizardStepTitle}</h2>
           </div>
         </div>
 
@@ -7741,6 +8098,9 @@ function App() {
           className="wizard-step-tabs"
           aria-label="Wizard steps"
           data-walkthrough-target="wizard-steps"
+          style={{
+            gridTemplateColumns: `34px repeat(${visibleWizardSteps.length}, minmax(34px, 1fr)) 34px`,
+          }}
         >
           <button
             type="button"
@@ -7751,17 +8111,20 @@ function App() {
           >
             <ChevronLeft size={16} aria-hidden="true" />
           </button>
-          {WIZARD_STEPS.map((step, index) => (
-            <button
-              type="button"
-              key={step.id}
-              className={index === wizardStepIndex ? "wizard-step-tab active" : "wizard-step-tab"}
-              onClick={() => setWizardStepIndex(index)}
-              aria-label={`Open ${step.title} step`}
-            >
-              <span>{index + 1}</span>
-            </button>
-          ))}
+          {visibleWizardSteps.map((step, index) => {
+            const originalStepIndex = WIZARD_STEPS.findIndex((candidate) => candidate.id === step.id);
+            return (
+              <button
+                type="button"
+                key={step.id}
+                className={step.id === wizardStep.id ? "wizard-step-tab active" : "wizard-step-tab"}
+                onClick={() => setWizardStepIndex(originalStepIndex)}
+                aria-label={`Open ${step.title} step`}
+              >
+                <span>{index + 1}</span>
+              </button>
+            );
+          })}
           <button
             type="button"
             className="wizard-step-arrow"
@@ -7777,12 +8140,12 @@ function App() {
       {wizardStep.id === "content" ? (
         <section className="wizard-card" data-walkthrough-target="wizard-content-card">
           <div className="wizard-card-head">
-            <ContentSectionHeaderPreview state={baseState} />
-            <h3>Content</h3>
+            <ContentSectionHeaderPreview state={state} />
+            <h3>Content {editorTargetContextLabel}</h3>
             <label className="section-panel-switch wizard-inline-switch" title="Toggle content">
               <input
                 type="checkbox"
-                checked={baseState.contentEnabled}
+                checked={isContentSectionEnabled}
                 onChange={(event) => handleContentSectionEnabledChange(event.target.checked)}
               />
               <span className="section-panel-switch-track" aria-hidden="true">
@@ -7793,18 +8156,18 @@ function App() {
 
           <ToggleGroup
             options={MODES}
-            value={baseState.mode}
+            value={state.mode}
             onChange={(mode) => patchState({ mode })}
             labels={MODE_TOGGLE_LABELS}
           />
 
-          {baseState.mode === "text" ? (
+          {state.mode === "text" ? (
             <>
               <label>
                 Text or emoji
                 <input
                   type="text"
-                  value={baseState.content}
+                  value={state.content}
                   maxLength={12}
                   onChange={(event) => patchState({ content: event.target.value })}
                   placeholder="A, OK, :)"
@@ -7821,7 +8184,7 @@ function App() {
                   onClick={() => setFontPickerOpen(true)}
                 >
                   <span className="font-picker-trigger-title">{selectedFontLabel}</span>
-                  <span className="font-picker-trigger-preview" style={{ fontFamily: baseState.fontFamily }}>
+                  <span className="font-picker-trigger-preview" style={{ fontFamily: state.fontFamily }}>
                     Aa Bb 123
                   </span>
                 </button>
@@ -7837,10 +8200,10 @@ function App() {
                   max={FONT_WEIGHT_MAX}
                   step={100}
                   list="wizard-font-weight-stops"
-                  value={Number.parseInt(baseState.fontWeight, 10)}
+                  value={Number.parseInt(state.fontWeight, 10)}
                   onChange={(event) => patchState({ fontWeight: String(Number(event.target.value)) })}
                 />
-                <small>{baseState.fontWeight}</small>
+                <small>{state.fontWeight}</small>
               </label>
               <datalist id="wizard-font-weight-stops">
                 {FONT_WEIGHT_STOPS.map((weight) => (
@@ -7848,22 +8211,30 @@ function App() {
                 ))}
               </datalist>
             </>
-          ) : baseState.mode === "image" ? (
+          ) : state.mode === "image" ? (
             <ImageEditorControls
               targetLabel="Content image"
               inputRef={contentImageUploadInputRef}
-              imageState={getImageStateForTarget(baseState, "content")}
+              imageState={getImageStateForTarget(state, "content")}
               exportSizeLabel="Use content image size for export"
               exportSizeSummary={
-                baseState.contentEnabled && baseState.mode === "image" && preferredImageExportDimensions
+                !isEditingParticle && baseState.contentEnabled && baseState.mode === "image" && preferredImageExportDimensions
                   ? exportSizeSummary
-                  : "Square canvas export"
+                  : isEditingParticle
+                    ? "Export size follows the primary part composition"
+                    : "Square canvas export"
               }
               isExportSizeEnabled={
-                baseState.contentEnabled && baseState.mode === "image" && Boolean(preferredImageExportDimensions)
+                !isEditingParticle &&
+                baseState.contentEnabled &&
+                baseState.mode === "image" &&
+                Boolean(preferredImageExportDimensions)
               }
               isUsingExportImageSize={
-                baseState.contentEnabled && baseState.mode === "image" && shouldUseImportedImageExportSize
+                !isEditingParticle &&
+                baseState.contentEnabled &&
+                baseState.mode === "image" &&
+                shouldUseImportedImageExportSize
               }
               onExportSizeToggle={setUseImportedImageExportSize}
               onFileChange={(event) => handleImageFileChange(event, "content")}
@@ -7878,7 +8249,7 @@ function App() {
                 Icon name
                 <input
                   type="text"
-                  value={baseState.lucide}
+                  value={state.lucide}
                   onChange={(event) => patchState({ lucide: event.target.value })}
                   onBlur={(event) =>
                     patchState({
@@ -7892,9 +8263,9 @@ function App() {
                     Browse all icons
                   </button>
                 </div>
-                <span className={baseMetrics.hasValidLucide ? "status ok" : "status warn"}>
-                  {baseMetrics.hasValidLucide
-                    ? `Loaded ${baseMetrics.iconName}`
+                <span className={activeMetrics.hasValidLucide ? "status ok" : "status warn"}>
+                  {activeMetrics.hasValidLucide
+                    ? `Loaded ${activeMetrics.iconName}`
                     : "Name not found, using sparkles"}
                 </span>
               </label>
@@ -7909,10 +8280,10 @@ function App() {
                   max={LUCIDE_WEIGHT_MAX}
                   step={0.4}
                   list="wizard-lucide-weight-stops"
-                  value={baseState.lucideWeight}
+                  value={state.lucideWeight}
                   onChange={(event) => patchState({ lucideWeight: Number.parseFloat(event.target.value) })}
                 />
-                <small>{baseState.lucideWeight.toFixed(1)}px</small>
+                <small>{state.lucideWeight.toFixed(1)}px</small>
               </label>
               <datalist id="wizard-lucide-weight-stops">
                 {LUCIDE_WEIGHT_STOPS.map((weight) => (
@@ -7924,33 +8295,33 @@ function App() {
 
           <label>
             <span className="label-head">
-              Content size in base
+              {contentSizeLabel}
               <HelpHint text={ADVANCED_HELP.iconScale} setTooltip={setCursorTooltip} />
             </span>
-            <input
-              type="range"
-              min={ICON_SCALE_MIN}
-              max={baseContentScaleMax}
-              step={2}
-              value={baseState.iconScale}
-              onChange={(event) => handleIconScaleChange(Number(event.target.value))}
-            />
-            <div className="size-quick-row">
-              {[60, 80, 100].map((scale) => (
-                <button
-                  type="button"
-                  key={scale}
-                  className={baseState.iconScale === scale ? "size-chip active" : "size-chip"}
-                  onClick={() => handleIconScaleChange(scale)}
-                >
+              <input
+                type="range"
+                min={ICON_SCALE_MIN}
+                max={contentScaleMax}
+                step={2}
+                value={state.iconScale}
+                onChange={(event) => handleIconScaleChange(Number(event.target.value))}
+              />
+              <div className="size-quick-row">
+                {[60, 80, 100].map((scale) => (
+                  <button
+                    type="button"
+                    key={scale}
+                    className={state.iconScale === scale ? "size-chip active" : "size-chip"}
+                    onClick={() => handleIconScaleChange(scale)}
+                  >
                   {scale === 60 ? "S" : scale === 80 ? "M" : "L"}
                 </button>
               ))}
-            </div>
-            <small>{baseState.iconScale}% of the base</small>
-            {isBaseTextScaleCappedByLink ? (
+              </div>
+            <small>{state.iconScale}% of the {currentBaseLabel}</small>
+            {isTextScaleCappedByLink ? (
               <small className="status warn">
-                Content size has reached the linked text-size limit for this base. Switch to
+                Content size has reached the linked text-size limit for this {currentBaseLabel}. Switch to
                 Editor, open Content &gt; Advanced, and turn off Link text size to base size to make
                 it larger.
               </small>
@@ -7960,11 +8331,11 @@ function App() {
           <div className="color-controls-grid">
             <label className="color-dot-control">
               <span>Content</span>
-              <input
-                type="color"
-                value={baseState.textColor}
-                onChange={(event) => handleColorChange("textColor", event.target.value)}
-              />
+                <input
+                  type="color"
+                  value={state.textColor}
+                  onChange={(event) => handleColorChange("textColor", event.target.value)}
+                />
             </label>
             <label>
               Content transparency
@@ -7973,14 +8344,26 @@ function App() {
                 min={0}
                 max={100}
                 step={1}
-                value={baseState.contentOpacity}
+                value={state.contentOpacity}
                 onChange={(event) => patchState({ contentOpacity: Number(event.target.value) })}
               />
-              <small>{baseState.contentOpacity}%</small>
+              <small>{state.contentOpacity}%</small>
             </label>
           </div>
 
-          {baseState.mode !== "none" ? (
+          <label className="advanced-check">
+            <input
+              type="checkbox"
+              checked={state.clipContentToBase}
+              onChange={(event) => patchState({ clipContentToBase: event.target.checked })}
+            />
+            <span className="label-head">
+              Clip content to base
+              <HelpHint text={ADVANCED_HELP.clipContentToBase} setTooltip={setCursorTooltip} />
+            </span>
+          </label>
+
+          {state.mode !== "none" ? (
             <div className="field-actions">
               <button type="button" className="btn-ghost" onClick={handleCenterContentToBase}>
                 Center content to base
@@ -7988,21 +8371,21 @@ function App() {
             </div>
           ) : null}
 
-          {baseState.mode !== "none" ? (
+          {state.mode !== "none" ? (
             <div className="content-zone-control">
               <span>Zone</span>
               <ContentZoneControl
-                iconState={baseState}
-                metrics={baseMetrics}
+                iconState={state}
+                metrics={activeMetrics}
                 onChange={handleContentZoneChange}
                 onReset={handleResetContentZone}
               />
             </div>
           ) : null}
 
-          {baseState.mode === "text" || baseState.mode === "icon" ? (
+          {state.mode === "text" || state.mode === "icon" ? (
             <ContentRotationControl
-              value={baseState.contentRotation}
+              value={state.contentRotation}
               onChange={(contentRotation) => patchState({ contentRotation })}
               onReset={() => patchState({ contentRotation: DEFAULT_STATE.contentRotation })}
             />
@@ -8013,12 +8396,12 @@ function App() {
       {wizardStep.id === "base" ? (
         <section className="wizard-card" data-walkthrough-target="wizard-base-card">
           <div className="wizard-card-head">
-            <ShapeSectionHeaderPreview state={baseState} />
-            <h3>Base</h3>
+            <ShapeSectionHeaderPreview state={state} />
+            <h3>Base {editorTargetContextLabel}</h3>
             <label className="section-panel-switch wizard-inline-switch" title="Toggle base">
               <input
                 type="checkbox"
-                checked={baseState.shapeEnabled}
+                checked={isShapeSectionEnabled}
                 onChange={(event) => handleShapeSectionEnabledChange(event.target.checked)}
               />
               <span className="section-panel-switch-track" aria-hidden="true">
@@ -8035,29 +8418,35 @@ function App() {
             <input
               type="range"
               min={ICON_BASE_SIZE_MIN}
-              max={ICON_BASE_SIZE_MAX}
-              step={2}
-              value={baseState.size}
-              onChange={(event) => patchState({ size: Number(event.target.value) })}
-            />
+                max={ICON_BASE_SIZE_MAX}
+                step={2}
+                value={state.size}
+                onChange={(event) => patchState({ size: Number(event.target.value) })}
+              />
             <div className="size-quick-row">
               {ICON_BASE_SIZE_PRESETS.map((presetSize) => (
                 <button
-                  type="button"
-                  key={presetSize}
-                  className={baseState.size === presetSize ? "size-chip active" : "size-chip"}
-                  onClick={() => patchState({ size: presetSize })}
-                >
+                    type="button"
+                    key={presetSize}
+                    className={state.size === presetSize ? "size-chip active" : "size-chip"}
+                    onClick={() => patchState({ size: presetSize })}
+                  >
                   {presetSize}
                 </button>
               ))}
             </div>
-            <small>{baseState.size}px</small>
+            <small>{state.size}px</small>
           </label>
 
           <div className="field-actions">
-            <button type="button" className="btn-ghost" onClick={handleCenterBaseToIcon}>
-              Center base to icon
+            <button
+              type="button"
+              className="btn-ghost field-action-icon"
+              onClick={handleCenterBaseToIcon}
+              aria-label="Center base to icon"
+              title="Center base to icon"
+            >
+              <Crosshair size={15} aria-hidden="true" />
             </button>
           </div>
 
@@ -8093,10 +8482,10 @@ function App() {
                     min={ICON_SCALE_MIN}
                     max={260}
                     step={2}
-                    value={baseState.widthScale}
-                    onChange={(event) => patchState({ widthScale: Number(event.target.value) })}
-                  />
-                  <small>{(baseState.widthScale / 100).toFixed(2)}x</small>
+	                    value={state.widthScale}
+	                    onChange={(event) => patchState({ widthScale: Number(event.target.value) })}
+	                  />
+	                  <small>{(state.widthScale / 100).toFixed(2)}x</small>
                 </label>
                 <label>
                   Height scale
@@ -8105,10 +8494,10 @@ function App() {
                     min={SHAPE_HEIGHT_SCALE_MIN}
                     max={SHAPE_HEIGHT_SCALE_MAX}
                     step={2}
-                    value={baseState.heightScale}
-                    onChange={(event) => patchState({ heightScale: Number(event.target.value) })}
-                  />
-                  <small>{(baseState.heightScale / 100).toFixed(2)}x</small>
+	                    value={state.heightScale}
+	                    onChange={(event) => patchState({ heightScale: Number(event.target.value) })}
+	                  />
+	                  <small>{(state.heightScale / 100).toFixed(2)}x</small>
                 </label>
               </div>
               <label>
@@ -8118,30 +8507,38 @@ function App() {
                   min={0}
                   max={SHAPE_RADIUS_MAX}
                   step={2}
-                  value={baseState.radius}
-                  onChange={(event) => patchState({ radius: Number(event.target.value) })}
-                />
-                <small>{baseState.radius}px</small>
+	                  value={state.radius}
+	                  onChange={(event) => patchState({ radius: Number(event.target.value) })}
+	                />
+	                <small>{state.radius}px</small>
               </label>
             </>
           ) : selectedShapeMode === "folder" ? (
-            <FolderControls state={baseState} patchState={patchState} />
+            <FolderControls state={state} patchState={patchState} />
           ) : (
             <ImageEditorControls
               targetLabel="Shape image"
               inputRef={shapeImageUploadInputRef}
-              imageState={getImageStateForTarget(baseState, "shape")}
+              imageState={getImageStateForTarget(state, "shape")}
               exportSizeLabel="Use shape image size for export"
               exportSizeSummary={
-                baseState.shapeEnabled && baseState.shape === "image" && preferredImageExportDimensions
+                !isEditingParticle && baseState.shapeEnabled && baseState.shape === "image" && preferredImageExportDimensions
                   ? exportSizeSummary
-                  : "Square canvas export"
+                  : isEditingParticle
+                    ? "Export size follows the primary part composition"
+                    : "Square canvas export"
               }
               isExportSizeEnabled={
-                baseState.shapeEnabled && baseState.shape === "image" && Boolean(preferredImageExportDimensions)
+                !isEditingParticle &&
+                baseState.shapeEnabled &&
+                baseState.shape === "image" &&
+                Boolean(preferredImageExportDimensions)
               }
               isUsingExportImageSize={
-                baseState.shapeEnabled && baseState.shape === "image" && shouldUseImportedImageExportSize
+                !isEditingParticle &&
+                baseState.shapeEnabled &&
+                baseState.shape === "image" &&
+                shouldUseImportedImageExportSize
               }
               onExportSizeToggle={setUseImportedImageExportSize}
               onFileChange={(event) => handleImageFileChange(event, "shape")}
@@ -8149,7 +8546,7 @@ function App() {
               onRecrop={() => handleRecropExistingImage("shape")}
               onRemove={() => handleRemoveImage("shape")}
               onPatch={(patch) =>
-                patchState(getImagePatchForTarget("shape", { ...getImageStateForTarget(baseState, "shape"), ...patch }))
+                patchState(getImagePatchForTarget("shape", { ...getImageStateForTarget(state, "shape"), ...patch }))
               }
             />
           )}
@@ -8157,11 +8554,11 @@ function App() {
           <div className="gradient-control-pair">
             <GradientColorControl
               label="Fill"
-              stops={baseState.fillStops}
-              gradientType={baseState.fillGradientType}
-              angle={baseState.fillGradientAngle}
-              centerX={baseState.fillGradientCenterX}
-              centerY={baseState.fillGradientCenterY}
+              stops={state.fillStops}
+              gradientType={state.fillGradientType}
+              angle={state.fillGradientAngle}
+              centerX={state.fillGradientCenterX}
+              centerY={state.fillGradientCenterY}
               onStopChange={(index, value) => handleGradientStopChange("fillStops", index, value)}
               onAddStop={() => handleGradientStopAdd("fillStops")}
               onRemoveStop={(index) => handleGradientStopRemove("fillStops", index)}
@@ -8171,11 +8568,11 @@ function App() {
             />
             <GradientColorControl
               label="Stroke"
-              stops={baseState.strokeStops}
-              gradientType={baseState.strokeGradientType}
-              angle={baseState.strokeGradientAngle}
-              centerX={baseState.strokeGradientCenterX}
-              centerY={baseState.strokeGradientCenterY}
+              stops={state.strokeStops}
+              gradientType={state.strokeGradientType}
+              angle={state.strokeGradientAngle}
+              centerX={state.strokeGradientCenterX}
+              centerY={state.strokeGradientCenterY}
               onStopChange={(index, value) => handleGradientStopChange("strokeStops", index, value)}
               onAddStop={() => handleGradientStopAdd("strokeStops")}
               onRemoveStop={(index) => handleGradientStopRemove("strokeStops", index)}
@@ -8193,10 +8590,10 @@ function App() {
                 min={0}
                 max={24}
                 step={1}
-                value={baseState.outline}
+                value={state.outline}
                 onChange={(event) => patchState({ outline: Number(event.target.value) })}
               />
-              <small>{baseState.outline}px</small>
+              <small>{state.outline}px</small>
             </label>
             <label>
               Base transparency
@@ -8205,10 +8602,10 @@ function App() {
                 min={0}
                 max={100}
                 step={1}
-                value={baseState.baseOpacity}
+                value={state.baseOpacity}
                 onChange={(event) => patchState({ baseOpacity: Number(event.target.value) })}
               />
-              <small>{baseState.baseOpacity}%</small>
+              <small>{state.baseOpacity}%</small>
             </label>
           </div>
         </section>
@@ -8217,12 +8614,12 @@ function App() {
       {wizardStep.id === "back" ? (
         <section className="wizard-card" data-walkthrough-target="wizard-back-card">
           <div className="wizard-card-head">
-            <BackLayerSectionHeaderPreview state={baseState} />
-            <h3>Back</h3>
+            <BackLayerSectionHeaderPreview state={state} />
+            <h3>Back {editorTargetContextLabel}</h3>
             <label className="section-panel-switch wizard-inline-switch" title="Toggle back">
               <input
                 type="checkbox"
-                checked={baseState.backLayerEnabled}
+                checked={isBackLayerSectionEnabled}
                 onChange={(event) => handleBackLayerSectionEnabledChange(event.target.checked)}
               />
               <span className="section-panel-switch-track" aria-hidden="true">
@@ -8232,8 +8629,8 @@ function App() {
           </div>
 
           <BackLayerWheel
-            angle={baseState.backAngle}
-            distance={baseState.backDistance}
+            angle={state.backAngle}
+            distance={state.backDistance}
             onChange={handleBackLayerChange}
             lockDistance={isBackDistanceLocked}
             lockAngle={isBackAngleLocked}
@@ -8245,7 +8642,7 @@ function App() {
               <span>Back</span>
               <input
                 type="color"
-                value={baseState.backColor}
+                value={state.backColor}
                 onChange={(event) => handleColorChange("backColor", event.target.value)}
               />
             </label>
@@ -8321,22 +8718,6 @@ function App() {
           </div>
 
           <div className="wizard-summary-grid">
-            <label className="export-share-pane-label wizard-share-setting">
-              <span>Workspace canvas</span>
-              <div className="size-quick-row">
-                {CANVAS_SIZE_PRESETS.map((size) => (
-                  <button
-                    type="button"
-                    key={size}
-                    className={canvasSize === size ? "size-chip active" : "size-chip"}
-                    onClick={() => handleCanvasSizeChange(size)}
-                  >
-                    {size}
-                  </button>
-                ))}
-              </div>
-              <small>{canvasSize} x {canvasSize}</small>
-            </label>
             <label className="export-share-pane-label wizard-share-setting">
               <span>PNG scale</span>
               <div className="size-quick-row">
@@ -8457,23 +8838,83 @@ function App() {
       </div>
     ) : null;
 
-  const aboutModal = (
+  const whyIquanModal = (
     <Modal
       open={isInfoOpen}
-      title="About Iquan Icon Builder"
+      title="Why Iquan?"
       onClose={() => setInfoOpen(false)}
       actions={
-        <button type="button" className="btn-secondary" onClick={() => setInfoOpen(false)}>
-          Seems Cool
+        <>
+          <button
+            type="button"
+            className="btn-ghost"
+            onClick={() => {
+              setInfoOpen(false);
+              setAboutOpen(true);
+            }}
+          >
+            About Me
+          </button>
+          <button type="button" className="btn-secondary" onClick={handleOpenSpecModal}>
+            Add Iquans to your app
+          </button>
+          <button type="button" className="btn-primary" onClick={() => setInfoOpen(false)}>
+            Create an iquan
+          </button>
+        </>
+      }
+    >
+      <div className="about-modal-content why-iquan-content">
+        <p className="about-modal-copy">
+          Small visual assets show up everywhere: chats, docs, reactions, status badges,
+          lightweight UI, and the tiny pieces of expression people use to make digital work feel
+          personal. Iquan exists because those assets should not require opening a full design
+          tool every time.
+        </p>
+        <div className="why-iquan-grid">
+          <section>
+            <h4>Fast to make</h4>
+            <p>Start with a preset, then shape text, Lucide icons, or uploaded images.</p>
+          </section>
+          <section>
+            <h4>Easy to trust</h4>
+            <p>Preview the same icon on light, dark, black, and message surfaces before export.</p>
+          </section>
+          <section>
+            <h4>Ready to reuse</h4>
+            <p>Export PNGs, copy share links, or save project files for full-fidelity editing.</p>
+          </section>
+          <section>
+            <h4>More than PNGs</h4>
+            <p>
+              Iquan includes a portable share-code format and an implementation spec so Codex can
+              add iquan rendering to another app.
+            </p>
+          </section>
+        </div>
+        <p className="why-iquan-built">
+          Built with Codex as a React/Vite app for the OpenAI x Handshake Codex Creator Challenge.
+        </p>
+      </div>
+    </Modal>
+  );
+
+  const aboutMeModal = (
+    <Modal
+      open={isAboutOpen}
+      title="About Me"
+      onClose={() => setAboutOpen(false)}
+      actions={
+        <button type="button" className="btn-secondary" onClick={() => setAboutOpen(false)}>
+          Close
         </button>
       }
     >
       <div className="about-modal-content">
         <p className="about-modal-copy">
-          Iquan is a fast icon builder for the tiny visual assets that show up everywhere:
-          chat reactions, doc stickers, status badges, and lightweight UI icons. It was built
-          for the Codex Creator Challenge by Owen Whelan to make polished icon work feel quick
-          instead of heavyweight.
+          Iquan was created by Owen Whelan for the Codex Creator Challenge. The product idea,
+          interface, rendering model, sharing flow, and implementation spec were shaped through
+          iterative Codex-assisted development.
         </p>
         <div className="about-modal-links">
           <a
@@ -8482,15 +8923,7 @@ function App() {
             target="_blank"
             rel="noreferrer"
           >
-            About Me
-          </a>
-          <a
-            className="about-modal-link about-modal-link-secondary"
-            href="https://github.com/RockhopperHD/iquan"
-            target="_blank"
-            rel="noreferrer"
-          >
-            GitHub Repo
+            About Owen
           </a>
         </div>
       </div>
@@ -8504,14 +8937,6 @@ function App() {
       onClose={() => setSpecOpen(false)}
       actions={
         <>
-          <a
-            className="about-modal-link about-modal-link-secondary iquan-spec-action-link iquan-spec-repo-action"
-            href="https://github.com/RockhopperHD/iquan"
-            target="_blank"
-            rel="noreferrer"
-          >
-            View GitHub repo
-          </a>
           <button type="button" className="btn-secondary" onClick={handleCopyIquanSpec}>
             <Clipboard size={16} aria-hidden="true" />
             Copy spec
@@ -8525,10 +8950,9 @@ function App() {
     >
       <div className="about-modal-content iquan-spec-modal-content">
         <p className="about-modal-copy">
-          Give this Markdown spec to your LLM coder so it can add iquan decoding,
-          rendering, and inline display support to another app. You can do this with Codex:
-          copy or download the spec, open your app in Codex, and ask it to add iquan support
-          using <code>IQUAN_SPEC.md</code>.
+          Iquan is designed as a portable mini-format, not just an export button. Give this
+          Markdown spec to Codex so it can add iquan decoding, rendering, and inline display
+          support to another app.
         </p>
         <label className="iquan-spec-code-field">
           <span>IQUAN_SPEC.md</span>
@@ -8563,15 +8987,16 @@ function App() {
             </button>
             <button
               type="button"
-              className="app-header-info"
+              className="app-header-info app-header-why"
               onClick={() => {
                 setSpecOpen(false);
+                setAboutOpen(false);
                 setInfoOpen(true);
               }}
-              aria-label="Open app information"
-              title="App information"
+              aria-label="Open Why Iquan"
+              title="Why Iquan?"
             >
-              i
+              Why Iquan?
             </button>
           </div>
         </header>
@@ -8682,7 +9107,8 @@ function App() {
           </section>
 
           {exportCaptureBuffer}
-          {aboutModal}
+          {whyIquanModal}
+          {aboutMeModal}
           {specModal}
           {toast ? <div className="toast">{toast}</div> : null}
         </main>
@@ -8691,7 +9117,11 @@ function App() {
   }
 
   return (
-    <div className="app-shell" data-ui-phase={uiPhase}>
+    <div
+      className="app-shell"
+      data-ui-phase={uiPhase}
+      data-editing-target={isEditingParticle ? "particle" : "primary"}
+    >
       <header className="app-header" aria-live="polite">
         <div className="app-header-side">
           <button
@@ -8745,15 +9175,16 @@ function App() {
           </button>
           <button
             type="button"
-            className="app-header-info"
+            className="app-header-info app-header-why"
             onClick={() => {
               setSpecOpen(false);
+              setAboutOpen(false);
               setInfoOpen(true);
             }}
-            aria-label="Open app information"
-            title="App information"
+            aria-label="Open Why Iquan"
+            title="Why Iquan?"
           >
-            i
+            Why Iquan?
           </button>
         </div>
       </header>
@@ -8785,37 +9216,37 @@ function App() {
 
         <aside ref={controlsRef} className="controls">
           <div className="controls-content" aria-hidden={isHeroVisible}>
-        {workspaceMode === "wizard" ? (
-          wizardPanel
-        ) : (
-          <>
-        <div className="editor-target-banner">
-          <div className="editor-target-head">
-            <h2 className="editor-target-title">
-              Editing {isEditingParticle ? `${getCornerLabel(editorTarget.corner)} particle` : "base"}
-            </h2>
-            <div className="editor-target-actions">
-              {isEditingParticle ? (
-                <>
-                  <button
-                    type="button"
-                    className="btn-ghost"
-                    onClick={() => setEditorTarget({ type: "base" })}
-                  >
-                    Switch to base
-                  </button>
-                  <button
-                    type="button"
-                    className="btn-ghost"
-                    onClick={() => handleRemoveParticle(editorTarget.corner)}
-                  >
-                    Delete particle
-                  </button>
-                </>
-              ) : null}
+            {workspaceMode === "wizard" ? (
+              wizardPanel
+            ) : (
+              <>
+            <div className="editor-target-banner">
+              <div className="editor-target-head">
+                <h2 className="editor-target-title">
+                  Editing {isEditingParticle ? `${getCornerLabel(editorTarget.corner)} particle` : "primary part"}
+                </h2>
+                <div className="editor-target-actions">
+                  {isEditingParticle ? (
+                    <>
+                      <button
+                        type="button"
+                        className="btn-ghost"
+                        onClick={() => setEditorTarget({ type: "base" })}
+                      >
+                        Switch to primary part
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-ghost"
+                        onClick={() => handleRemoveParticle(editorTarget.corner)}
+                      >
+                        Delete particle
+                      </button>
+                    </>
+                  ) : null}
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
 
         {isEditingParticle ? (
           <section className="section-panel particle-position-panel">
@@ -8830,12 +9261,12 @@ function App() {
                 min={-PARTICLE_OFFSET_LIMIT}
                 max={PARTICLE_OFFSET_LIMIT}
                 step={1}
-                value={activeParticle.offsetX}
+                value={Math.round(activeParticle.offsetX)}
                 onChange={(event) =>
                   handleParticleOffsetChange(Number(event.target.value), activeParticle.offsetY)
                 }
               />
-              <small>{activeParticle.offsetX}px</small>
+              <small>{Math.round(activeParticle.offsetX)}px</small>
             </label>
             <label>
               Vertical offset
@@ -8844,12 +9275,12 @@ function App() {
                 min={-PARTICLE_OFFSET_LIMIT}
                 max={PARTICLE_OFFSET_LIMIT}
                 step={1}
-                value={activeParticle.offsetY}
+                value={Math.round(activeParticle.offsetY)}
                 onChange={(event) =>
                   handleParticleOffsetChange(activeParticle.offsetX, Number(event.target.value))
                 }
               />
-              <small>{activeParticle.offsetY}px</small>
+              <small>{Math.round(activeParticle.offsetY)}px</small>
             </label>
             <div className="particle-nudge-pad" role="group" aria-label="Nudge particle position">
               <button
@@ -8970,7 +9401,7 @@ function App() {
                   exportSizeSummary={
                     baseState.contentEnabled && baseState.mode === "image" && preferredImageExportDimensions
                       ? exportSizeSummary
-                      : "Export uses the 500 x 500 square canvas until this image is active in the base composition."
+                      : "Export uses the 640 x 640 square canvas until this image is active in the primary part composition."
                   }
                   isExportSizeEnabled={
                     baseState.contentEnabled && baseState.mode === "image" && Boolean(preferredImageExportDimensions)
@@ -9077,6 +9508,18 @@ function App() {
                   }
                 />
                 <small>{state.contentOpacity}%</small>
+              </label>
+
+              <label className="advanced-check">
+                <input
+                  type="checkbox"
+                  checked={state.clipContentToBase}
+                  onChange={(event) => patchState({ clipContentToBase: event.target.checked })}
+                />
+                <span className="label-head">
+                  Clip content to base
+                  <HelpHint text={ADVANCED_HELP.clipContentToBase} setTooltip={setCursorTooltip} />
+                </span>
               </label>
 
               {state.mode === "text" || state.mode === "icon" ? (
@@ -9249,8 +9692,14 @@ function App() {
               </label>
 
               <div className="field-actions">
-                <button type="button" className="btn-ghost" onClick={handleCenterBaseToIcon}>
-                  Center base to icon
+                <button
+                  type="button"
+                  className="btn-ghost field-action-icon"
+                  onClick={handleCenterBaseToIcon}
+                  aria-label="Center base to icon"
+                  title="Center base to icon"
+                >
+                  <Crosshair size={15} aria-hidden="true" />
                 </button>
               </div>
 
@@ -9460,7 +9909,7 @@ function App() {
                     exportSizeSummary={
                       baseState.shapeEnabled && baseState.shape === "image" && preferredImageExportDimensions
                         ? exportSizeSummary
-                        : "Export uses the 500 x 500 square canvas until this shape image is active in the base composition."
+                        : "Export uses the 640 x 640 square canvas until this shape image is active in the primary part composition."
                     }
                     isExportSizeEnabled={
                       baseState.shapeEnabled && baseState.shape === "image" && Boolean(preferredImageExportDimensions)
@@ -9644,14 +10093,18 @@ function App() {
           <div className="controls-hero" aria-hidden={!isHeroVisible}>
             <div className="controls-hero-content">
               <p className="controls-hero-eyebrow">Iquan</p>
-              <h1>Tiny icons for real places</h1>
+              <h1>Create an iquan in minutes</h1>
               <p className="controls-hero-copy">{HERO_DESCRIPTION}</p>
               <p className="controls-hero-story">
                 Shape <strong>text</strong>, <strong>Lucide symbols</strong>, and{" "}
-                <strong>uploaded images</strong> into crisp little assets; tune the base,
-                outlines, particles, and colors, then preview them where they actually live
-                before exporting a PNG or saving the whole project.
+                <strong>uploaded images</strong> into polished little assets; tune the base,
+                outlines, particles, and colors, then preview them where they actually live.
               </p>
+              <ol className="controls-hero-demo-path" aria-label="Demo path">
+                {LANDING_DEMO_STEPS.map((step) => (
+                  <li key={step}>{step}</li>
+                ))}
+              </ol>
               <label className="controls-hero-walkthrough">
                 <input
                   type="checkbox"
@@ -9680,17 +10133,30 @@ function App() {
                   >
                     Import Project
                   </button>
+                  <button
+                    type="button"
+                    className="btn-secondary controls-hero-alt-button"
+                    onClick={() => {
+                      setAboutOpen(false);
+                      setSpecOpen(false);
+                      setInfoOpen(true);
+                    }}
+                  >
+                    Why Iquan?
+                  </button>
                 </div>
               </div>
-              <p className="starter-template-label">Start from a preset</p>
-              <div className="starter-template-grid" aria-label="Starter templates">
-                {STARTER_TEMPLATES.map((template) => (
-                  <StarterTemplateButton
-                    key={template.id}
-                    template={template}
-                    onClick={() => handleApplyStarterTemplate(template)}
-                  />
-                ))}
+              <div className="landing-template-section">
+                <p className="starter-template-label">Presets</p>
+                <div className="starter-template-grid" aria-label="Presets">
+                  {STARTER_TEMPLATES.map((template) => (
+                    <StarterTemplateButton
+                      key={template.id}
+                      template={template}
+                      onClick={() => handleApplyStarterTemplate(template)}
+                    />
+                  ))}
+                </div>
               </div>
             </div>
           </div>
@@ -9706,7 +10172,7 @@ function App() {
           <div className="preview-body" aria-hidden={isHeroVisible}>
             <div className="preview-header">
               <span>
-                Base {baseMetrics.dimensions.width} x {baseMetrics.dimensions.height} in{" "}
+                Primary part {baseMetrics.dimensions.width} x {baseMetrics.dimensions.height} in{" "}
                 {canvasSize} x {canvasSize} canvas |{" "}
                 {baseState.mode === "text"
                   ? `fit ${baseMetrics.fittedFontSize}px`
@@ -9981,23 +10447,6 @@ function App() {
         </div>
 
         <label className="export-share-pane-label">
-          <span>Workspace canvas</span>
-          <div className="size-quick-row">
-            {CANVAS_SIZE_PRESETS.map((size) => (
-              <button
-                type="button"
-                key={size}
-                className={canvasSize === size ? "size-chip active" : "size-chip"}
-                onClick={() => handleCanvasSizeChange(size)}
-              >
-                {size}
-              </button>
-            ))}
-          </div>
-          <small>{canvasSize} x {canvasSize}</small>
-        </label>
-
-        <label className="export-share-pane-label">
           <span>PNG scale</span>
           <div className="size-quick-row">
             {EXPORT_SCALE_OPTIONS.map((scale) => (
@@ -10028,9 +10477,6 @@ function App() {
           <button type="button" className="btn-secondary" onClick={handleCopyShareLink}>
             Copy link
           </button>
-          <button type="button" className="btn-secondary" onClick={handleLoadIquanLogo}>
-            Use iquan logo
-          </button>
         </div>
 
         <button type="button" className="btn-primary export-pane-primary" onClick={handleExport}>
@@ -10050,7 +10496,8 @@ function App() {
         onChange={handleProjectFileChange}
       />
 
-      {aboutModal}
+      {whyIquanModal}
+      {aboutMeModal}
       {specModal}
 
       <Modal
